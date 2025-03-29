@@ -26,14 +26,28 @@ class AuthenticationManager: ObservableObject {
     
     func checkAuthenticationState() {
         if let user = Auth.auth().currentUser {
-            self.isAuthenticated = true
-            fetchUserData(userId: user.uid)
+            // User is authenticated with Firebase, but we need to fetch their data
+            isLoading = true
+            
+            fetchUserData(userId: user.uid) { success in
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.isAuthenticated = success
+                    
+                    // If we couldn't load the user data, sign out to avoid inconsistent state
+                    if !success {
+                        try? Auth.auth().signOut()
+                        self.isAuthenticated = false
+                        self.currentUser = nil
+                    }
+                }
+            }
         } else {
             self.isAuthenticated = false
             self.currentUser = nil
         }
     }
-    
+
     // Email/Password login with Firebase
     func loginWithEmailPassword(email: String, password: String) {
         isLoading = true
@@ -61,18 +75,24 @@ class AuthenticationManager: ObservableObject {
                         // For other Firebase errors, use the original error
                         self.error = error
                     }
-                } else {
-                    // For non-Firebase errors, use the original error
-                    self.error = error
                 }
                 return
             }
             
             if let authResult = authResult {
-                self.fetchUserData(userId: authResult.user.uid)
+                // Only set isAuthenticated after user data is loaded
+                self.fetchUserData(userId: authResult.user.uid) { success in
+                    DispatchQueue.main.async {
+                        // Only set isAuthenticated if we successfully loaded the user data
+                        self.isAuthenticated = success
+                    }
+                }
             }
         }
     }
+    
+        
+    
     
     func signUp(email: String, password: String, name: String) {
         isLoading = true
@@ -122,21 +142,27 @@ class AuthenticationManager: ObservableObject {
         }
     }
     
-    private func fetchUserData(userId: String) {
+    private func fetchUserData(userId: String, completion: @escaping (Bool) -> Void = {_ in}) {
         let db = Firestore.firestore()
         
         db.collection(FirebaseCollections.users).document(userId).getDocument { document, error in
             if let error = error {
                 self.error = error
+                completion(false)
                 return
             }
             
             if let document = document, document.exists {
                 do {
                     self.currentUser = try document.data(as: User.self)
+                    print("fetched user data successful!", self.currentUser)
+                    completion(true)
                 } catch {
                     self.error = error
+                    completion(false)
                 }
+            } else {
+                completion(false)
             }
         }
     }

@@ -35,7 +35,7 @@ struct fitrApp: App {
 
 #Preview {
     let authManager = AuthenticationManager()
-    authManager.isAuthenticated = true  // Change this value to test both states
+    authManager.isAuthenticated = false  // Change this value to test both states
 
     return Group {
         if authManager.isAuthenticated {

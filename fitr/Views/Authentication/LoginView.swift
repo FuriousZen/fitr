@@ -164,7 +164,7 @@ struct LoginView: View {
 
                 .padding(.horizontal, 30)
 
-
+                            
                 if let error = authManager.error {
                     let errorMessage = error.localizedDescription
                     Text(errorMessage)
