@@ -1,11 +1,3 @@
-//
-//  ClothingItem.swift
-//  fitr
-//
-//  Created by Ryan Nguyen on 3/29/25.
-//
-
-
 import Foundation
 
 enum ClothingType: String, Codable, CaseIterable {
@@ -24,7 +16,7 @@ enum ClothingType: String, Codable, CaseIterable {
     case other = "Other"
 }
 
-struct ClothingItem: Identifiable, Codable {
+struct ClothingItem: Identifiable, Codable, Equatable {
     var id: String
     var userId: String
     var imageURL: String
@@ -44,6 +36,11 @@ struct ClothingItem: Identifiable, Codable {
         case createdAt = "created_at"
         case weatherTags = "weather_tags"
     }
+    
+    // Implementation of Equatable protocol
+    static func == (lhs: ClothingItem, rhs: ClothingItem) -> Bool {
+        return lhs.id == rhs.id
+    }
 }
 
 enum WeatherTag: String, Codable, CaseIterable {
@@ -54,13 +51,4 @@ enum WeatherTag: String, Codable, CaseIterable {
     case rainy = "Rainy"
     case snowy = "Snowy"
     case windy = "Windy"
-}
-
-struct ClothingItem: Identifiable, Codable, Equatable {
-    // Your existing properties
-    
-    // Add this static function for Equatable conformance
-    static func == (lhs: ClothingItem, rhs: ClothingItem) -> Bool {
-        return lhs.id == rhs.id
-    }
 }

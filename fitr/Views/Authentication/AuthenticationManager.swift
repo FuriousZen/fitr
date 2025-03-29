@@ -51,7 +51,7 @@ class AuthenticationManager: ObservableObject {
                             case .success(let profile):
                                 // Create Firebase credential
                                 let credential = OAuthProvider.credential(
-                                    withProviderID: "auth0",
+                                    providerID: AuthProviderID.email,
                                     idToken: credentials.idToken,
                                     accessToken: credentials.accessToken
                                 )

@@ -8,12 +8,13 @@
 import SwiftUI
 
 struct AppColors {
-    static let lightPink = Color("EDAFB8")
-    static let peachSnaps = Color("F7E1D7")
-    static let moonMist = Color("DEDBD2")
-    static let springRain = Color("B0C4B1")
-    static let davyGrey = Color("4A5759")
+    static let davyGrey = Color(hex: "4A5759")
+    static let peachSnaps = Color(hex: "FFDAB9")
+    static let moonMist = Color(hex: "D3D3D3")
+    static let springRain = Color(hex: "8FBC8F")
+    static let lightPink = Color(hex: "FFB6C1")
 }
+
 
 struct APIKeys {
     static let openWeatherMapKey = "YOUR_OPENWEATHERMAP_API_KEY"
