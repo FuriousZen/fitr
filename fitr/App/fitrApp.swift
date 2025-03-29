@@ -34,16 +34,6 @@ struct fitrApp: App {
 }
 
 #Preview {
-    let authManager = AuthenticationManager()
-    authManager.isAuthenticated = false  // Change this value to test both states
-
-    return Group {
-        if authManager.isAuthenticated {
-            DashboardView()
-                .environmentObject(authManager)
-        } else {
-            LoginView()
-                .environmentObject(authManager)
-        }
-    }
+    AddClothingView()
+        .environmentObject(AuthenticationManager()) // Create a new instance for preview
 }
