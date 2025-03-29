@@ -232,7 +232,7 @@ struct AddClothingView: View {
     }
     
     private func classifyClothingWithAI() {
-        guard let image = selectedImage, let userId = authManager.currentUser?.id else {
+        guard let image = selectedImage else {
             errorMessage = "Image not available"
             return
         }
@@ -240,22 +240,22 @@ struct AddClothingView: View {
         isClassifying = true
         showAIClassificationResults = false
         
-        // First upload the image to get a URL
-        FirebaseService.shared.uploadClothingImage(image: image, userId: userId) { result in
-            switch result {
-            case .success(let imageURL):
-                // Now call the backend API to classify the clothing
-                self.callClothingClassificationAPI(imageURL: imageURL)
-            case .failure(let error):
-                DispatchQueue.main.async {
-                    self.isClassifying = false
-                    self.errorMessage = "Failed to upload image for classification: \(error.localizedDescription)"
-                }
+        // Convert the image to base64 for API call
+        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
+            DispatchQueue.main.async {
+                self.isClassifying = false
+                self.errorMessage = "Failed to process image"
             }
+            return
         }
+        
+        let base64Image = imageData.base64EncodedString()
+        
+        // Call the OpenAI API directly with the base64 image
+        callClothingClassificationAPIWithBase64(base64Image: base64Image)
     }
-    
-    private func callClothingClassificationAPI(imageURL: String) {
+
+    private func callClothingClassificationAPIWithBase64(base64Image: String) {
         guard let url = URL(string: "\(APIEndpoints.baseURL)\(APIEndpoints.clothingClassificationEndpoint)") else {
             DispatchQueue.main.async {
                 self.isClassifying = false
@@ -264,8 +264,8 @@ struct AddClothingView: View {
             return
         }
         
-        // Prepare request body
-        let requestBody = ["image_url": imageURL]
+        // Prepare request body with base64 image instead of URL
+        let requestBody = ["image_base64": base64Image]
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
