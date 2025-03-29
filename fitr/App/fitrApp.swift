@@ -7,7 +7,6 @@
 
 import SwiftUI
 import Firebase
-import Auth0
 
 @main
 struct fitrApp: App {
@@ -35,6 +34,16 @@ struct fitrApp: App {
 }
 
 #Preview {
-    LoginView()
-        .environmentObject(AuthenticationManager())
+    let authManager = AuthenticationManager()
+    authManager.isAuthenticated = true  // Change this value to test both states
+
+    return Group {
+        if authManager.isAuthenticated {
+            DashboardView()
+                .environmentObject(authManager)
+        } else {
+            LoginView()
+                .environmentObject(authManager)
+        }
+    }
 }

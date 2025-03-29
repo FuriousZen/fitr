@@ -12,11 +12,4 @@ struct User: Identifiable, Codable {
     var email: String
     var name: String
     var profileImageURL: String?
-    
-    enum CodingKeys: String, CodingKey {
-        case id
-        case email
-        case name
-        case profileImageURL = "profile_image_url"
-    }
 }

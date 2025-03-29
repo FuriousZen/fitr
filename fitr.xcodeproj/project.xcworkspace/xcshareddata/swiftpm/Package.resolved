@@ -1,5 +1,5 @@
 {
-  "originHash" : "5ae25e42300465f71a37151b13c4983286c3f5a312d36c016e6fc40c5e823240",
+  "originHash" : "3070b8fac9c73247cbef0a5cf9e2152e192c5788c4a081a0d3e6cc9237872176",
   "pins" : [
     {
       "identity" : "abseil-cpp-binary",
@@ -17,15 +17,6 @@
       "state" : {
         "revision" : "61b85103a1aeed8218f17c794687781505fbbef5",
         "version" : "11.2.0"
-      }
-    },
-    {
-      "identity" : "auth0.swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/auth0/Auth0.swift",
-      "state" : {
-        "revision" : "9fee002fcd5fa572c0452eaeb9fb7a75be5fa4de",
-        "version" : "2.10.0"
       }
     },
     {
@@ -92,15 +83,6 @@
       }
     },
     {
-      "identity" : "jwtdecode.swift",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/auth0/JWTDecode.swift.git",
-      "state" : {
-        "revision" : "1e153ef009969543191970c66b7c60163c0b4a65",
-        "version" : "3.2.0"
-      }
-    },
-    {
       "identity" : "kingfisher",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/onevcat/Kingfisher.git",
@@ -134,15 +116,6 @@
       "state" : {
         "revision" : "540318ecedd63d883069ae7f1ed811a2df00b6ac",
         "version" : "2.4.0"
-      }
-    },
-    {
-      "identity" : "simplekeychain",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/auth0/SimpleKeychain.git",
-      "state" : {
-        "revision" : "b694f155907b189bc82e93586695a26f558c742f",
-        "version" : "1.2.0"
       }
     },
     {

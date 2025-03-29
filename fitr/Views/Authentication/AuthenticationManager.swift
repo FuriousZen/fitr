@@ -1,14 +1,18 @@
-//
 //  AuthenticationManager.swift
+
 //  fitr
-//
-//  Created by Ryan Nguyen on 3/29/25.
+
 //
 
+//  Created by Ryan Nguyen on 3/29/25.
+
+//
+// In AuthenticationManager.swift
+
 import SwiftUI
-import Auth0
 import Firebase
 import FirebaseAuth
+import FirebaseFirestore
 
 class AuthenticationManager: ObservableObject {
     @Published var isAuthenticated = false
@@ -30,74 +34,37 @@ class AuthenticationManager: ObservableObject {
         }
     }
     
-    func loginWithAuth0() {
-        isLoading = true
-        
-        Auth0
-            .webAuth()
-            .scope("openid profile email")
-            .audience("https://your-api-identifier/")
-            .start { result in
-                self.isLoading = false
-                
-                switch result {
-                case .success(let credentials):
-                    // Get user info from Auth0
-                    Auth0
-                        .authentication()
-                        .userInfo(withAccessToken: credentials.accessToken)
-                        .start { result in
-                            switch result {
-                            case .success(let profile):
-                                // Create Firebase credential
-                                let credential = OAuthProvider.credential(
-                                    providerID: AuthProviderID.email,
-                                    idToken: credentials.idToken,
-                                    accessToken: credentials.accessToken
-                                )
-                                
-                                // Sign in to Firebase
-                                Auth.auth().signIn(with: credential) { authResult, error in
-                                    if let error = error {
-                                        self.error = error
-                                        return
-                                    }
-                                    
-                                    if let authResult = authResult {
-                                        // Create or update user in Firestore
-                                        let user = User(
-                                            id: authResult.user.uid,
-                                            email: profile.email ?? "",
-                                            name: profile.name ?? "",
-                                            profileImageURL: profile.picture?.absoluteString
-                                        )
-                                        
-                                        self.saveUserToFirestore(user: user)
-                                    }
-                                }
-                            case .failure(let error):
-                                self.error = error
-                            }
-                        }
-                case .failure(let error):
-                    self.error = error
-                }
-            }
-    }
-    
-    func loginWithApple() {
-        // Implementation for Apple Sign In
-        // This would use ASAuthorizationAppleIDProvider and ASAuthorizationAppleIDRequest
-    }
-    
+    // Email/Password login with Firebase
     func loginWithEmailPassword(email: String, password: String) {
         isLoading = true
+        error = nil
         
         Auth.auth().signIn(withEmail: email, password: password) { authResult, error in
             self.isLoading = false
             
-            if let error = error {
-                self.error = error
+            if let error = error as NSError? {
+                // Check for specific Firebase auth error codes
+                if error.domain == AuthErrorDomain {
+                    // Handle specific Firebase auth errors
+                    switch error.code {
+                    case AuthErrorCode.invalidCredential.rawValue,
+                         AuthErrorCode.wrongPassword.rawValue,
+                         AuthErrorCode.userNotFound.rawValue,
+                         AuthErrorCode.invalidEmail.rawValue:
+                        // Create a user-friendly error message
+                        self.error = NSError(
+                            domain: "app.fitr",
+                            code: error.code,
+                            userInfo: [NSLocalizedDescriptionKey: "Invalid email or password"]
+                        )
+                    default:
+                        // For other Firebase errors, use the original error
+                        self.error = error
+                    }
+                } else {
+                    // For non-Firebase errors, use the original error
+                    self.error = error
+                }
                 return
             }
             
@@ -134,16 +101,10 @@ class AuthenticationManager: ObservableObject {
     func logout() {
         do {
             try Auth.auth().signOut()
-            
-            // Also clear Auth0 session
-            Auth0
-                .webAuth()
-                .clearSession { _ in
-                    DispatchQueue.main.async {
-                        self.isAuthenticated = false
-                        self.currentUser = nil
-                    }
-                }
+            DispatchQueue.main.async {
+                self.isAuthenticated = false
+                self.currentUser = nil
+            }
         } catch {
             self.error = error
         }

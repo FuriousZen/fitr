@@ -10,8 +10,6 @@
 		94014E872D985100001D58C5 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 94014E862D985100001D58C5 /* FirebaseAuth */; };
 		94014E892D985100001D58C5 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 94014E882D985100001D58C5 /* FirebaseFirestore */; };
 		94014E8B2D985100001D58C5 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 94014E8A2D985100001D58C5 /* FirebaseStorage */; };
-		94014E8F2D985394001D58C5 /* Auth0 in Frameworks */ = {isa = PBXBuildFile; productRef = 94014E8E2D985394001D58C5 /* Auth0 */; };
-		94014EC72D98561A001D58C5 /* Auth0.plist in Resources */ = {isa = PBXBuildFile; fileRef = 94014EC62D985613001D58C5 /* Auth0.plist */; };
 		944BC4C62D986A6000484019 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 944BC4C52D986A6000484019 /* Kingfisher */; };
 /* End PBXBuildFile section */
 
@@ -36,7 +34,6 @@
 		94014E4D2D984BBE001D58C5 /* fitr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = fitr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		94014E5F2D984BC0001D58C5 /* fitrTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = fitrTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		94014E692D984BC0001D58C5 /* fitrUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = fitrUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		94014EC62D985613001D58C5 /* Auth0.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Auth0.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -65,7 +62,6 @@
 				94014E872D985100001D58C5 /* FirebaseAuth in Frameworks */,
 				94014E892D985100001D58C5 /* FirebaseFirestore in Frameworks */,
 				94014E8B2D985100001D58C5 /* FirebaseStorage in Frameworks */,
-				94014E8F2D985394001D58C5 /* Auth0 in Frameworks */,
 				944BC4C62D986A6000484019 /* Kingfisher in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -90,7 +86,6 @@
 		94014E442D984BBE001D58C5 = {
 			isa = PBXGroup;
 			children = (
-				94014EC62D985613001D58C5 /* Auth0.plist */,
 				94014E4F2D984BBE001D58C5 /* fitr */,
 				94014E622D984BC0001D58C5 /* fitrTests */,
 				94014E6C2D984BC0001D58C5 /* fitrUITests */,
@@ -131,7 +126,6 @@
 				94014E862D985100001D58C5 /* FirebaseAuth */,
 				94014E882D985100001D58C5 /* FirebaseFirestore */,
 				94014E8A2D985100001D58C5 /* FirebaseStorage */,
-				94014E8E2D985394001D58C5 /* Auth0 */,
 				944BC4C52D986A6000484019 /* Kingfisher */,
 			);
 			productName = fitr;
@@ -214,7 +208,6 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				94014E852D985100001D58C5 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
-				94014E8D2D985394001D58C5 /* XCRemoteSwiftPackageReference "Auth0" */,
 				944BC4C42D986A6000484019 /* XCRemoteSwiftPackageReference "Kingfisher" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -234,7 +227,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				94014EC72D98561A001D58C5 /* Auth0.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -587,14 +579,6 @@
 				minimumVersion = 11.10.0;
 			};
 		};
-		94014E8D2D985394001D58C5 /* XCRemoteSwiftPackageReference "Auth0" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/auth0/Auth0.swift";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.10.0;
-			};
-		};
 		944BC4C42D986A6000484019 /* XCRemoteSwiftPackageReference "Kingfisher" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/onevcat/Kingfisher.git";
@@ -620,11 +604,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 94014E852D985100001D58C5 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseStorage;
-		};
-		94014E8E2D985394001D58C5 /* Auth0 */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 94014E8D2D985394001D58C5 /* XCRemoteSwiftPackageReference "Auth0" */;
-			productName = Auth0;
 		};
 		944BC4C52D986A6000484019 /* Kingfisher */ = {
 			isa = XCSwiftPackageProductDependency;
