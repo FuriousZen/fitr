@@ -20,6 +20,9 @@ struct AddClothingView: View {
     @State private var aiSuggestedType: ClothingType?
     @State private var aiSuggestedColor: String?
     
+    // Add this to prevent duplicate uploads
+    @State private var isUploading = false
+    
     var body: some View {
         NavigationView {
             ScrollView {
@@ -87,6 +90,7 @@ struct AddClothingView: View {
                                 .frame(maxWidth: .infinity)
                             }
                             .primaryButtonStyle()
+                            .disabled(isClassifying) // Prevent multiple clicks
                         }
                         
                         if isClassifying {
@@ -206,7 +210,7 @@ struct AddClothingView: View {
                         }
                     }
                     .primaryButtonStyle()
-                    .disabled(isLoading || selectedImage == nil || clothingName.isEmpty || clothingColor.isEmpty || selectedWeatherTags.isEmpty)
+                    .disabled(isLoading || isUploading || selectedImage == nil || clothingName.isEmpty || clothingColor.isEmpty || selectedWeatherTags.isEmpty)
                     .padding(.top, 10)
                 }
                 .padding()
@@ -232,8 +236,10 @@ struct AddClothingView: View {
     }
     
     private func classifyClothingWithAI() {
-        guard let image = selectedImage else {
-            errorMessage = "Image not available"
+        guard let image = selectedImage, !isClassifying else {
+            if selectedImage == nil {
+                errorMessage = "Image not available"
+            }
             return
         }
         
@@ -330,42 +336,50 @@ struct AddClothingView: View {
             return
         }
         
+        // Prevent multiple uploads
+        if isLoading || isUploading {
+            return
+        }
+        
         isLoading = true
+        isUploading = true
         errorMessage = nil
         
         // Upload image to Firebase Storage
         FirebaseService.shared.uploadClothingImage(image: image, userId: userId) { result in
-            switch result {
-            case .success(let imageURL):
-                // Create clothing item
-                let clothingItem = ClothingItem(
-                    id: UUID().uuidString,
-                    userId: userId,
-                    imageURL: imageURL,
-                    type: self.clothingType,
-                    color: self.clothingColor,
-                    name: self.clothingName,
-                    createdAt: Date(),
-                    weatherTags: Array(self.selectedWeatherTags)
-                )
-                
-                // Save to Firestore
-                FirebaseService.shared.saveClothingItem(item: clothingItem) { result in
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                        
-                        switch result {
-                        case .success:
-                            // Close the sheet
-                            self.presentationMode.wrappedValue.dismiss()
-                        case .failure(let error):
-                            self.errorMessage = "Failed to save clothing item: \(error.localizedDescription)"
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let imageURL):
+                    // Create clothing item
+                    let clothingItem = ClothingItem(
+                        id: UUID().uuidString,
+                        userId: userId,
+                        imageURL: imageURL,
+                        type: self.clothingType,
+                        color: self.clothingColor,
+                        name: self.clothingName,
+                        createdAt: Date(),
+                        weatherTags: Array(self.selectedWeatherTags)
+                    )
+                    
+                    // Save to Firestore
+                    FirebaseService.shared.saveClothingItem(item: clothingItem) { result in
+                        DispatchQueue.main.async {
+                            self.isLoading = false
+                            self.isUploading = false
+                            
+                            switch result {
+                            case .success:
+                                // Close the sheet
+                                self.presentationMode.wrappedValue.dismiss()
+                            case .failure(let error):
+                                self.errorMessage = "Failed to save clothing item: \(error.localizedDescription)"
+                            }
                         }
                     }
-                }
-            case .failure(let error):
-                DispatchQueue.main.async {
+                case .failure(let error):
                     self.isLoading = false
+                    self.isUploading = false
                     self.errorMessage = "Failed to upload image: \(error.localizedDescription)"
                 }
             }

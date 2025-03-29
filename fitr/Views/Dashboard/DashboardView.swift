@@ -19,6 +19,10 @@ struct DashboardView: View {
 @State private var errorMessage: String?
 @State private var isWardrobeEmpty = false
 @State private var selectedTab = 0
+    
+// Location retry tracking
+@State private var locationRetryCount = 0
+private let maxLocationRetries = 3
 
     var body: some View {
         if authManager.isLoading {
@@ -237,87 +241,118 @@ struct DashboardView: View {
         }
     }
 
-private func loadData() {
-    isLoading = true
-    errorMessage = nil
-    isWardrobeEmpty = false
-    print("inside load data", authManager.currentUser)
-    guard let userId = authManager.currentUser?.id else {
-        errorMessage = "User not authenticated"
-        isLoading = false
-        return
-    }
-    
-    // Load clothing items
-    FirebaseService.shared.getClothingItems(for: userId) { result in
-        switch result {
-        case .success(let items):
-            self.clothingItems = items
-            
-            // Check if user has any clothing items
-            if items.isEmpty {
-                DispatchQueue.main.async {
-                    self.isWardrobeEmpty = true
+    private func loadData() {
+        isLoading = true
+        errorMessage = nil
+        isWardrobeEmpty = false
+        locationRetryCount = 0
+        
+        guard let userId = authManager.currentUser?.id else {
+            errorMessage = "User not authenticated"
+            isLoading = false
+            return
+        }
+        
+        // Load clothing items first
+        FirebaseService.shared.getClothingItems(for: userId) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let items):
+                    self.clothingItems = items
+                    self.isWardrobeEmpty = items.isEmpty
+                    
+                    if !items.isEmpty {
+                        self.loadWeatherData()
+                    } else {
+                        self.isLoading = false
+                    }
+                    
+                case .failure(let error):
+                    self.errorMessage = "Failed to load wardrobe: \(error.localizedDescription)"
                     self.isLoading = false
                 }
-            } else {
+            }
+        }
+    }
+
+    private func loadWeatherData() {
+        // If we've exceeded retry attempts, use default weather
+        guard locationRetryCount < maxLocationRetries else {
+            self.useDefaultWeather()
+            return
+        }
+        
+        locationRetryCount += 1
+        
+        // If we have location, fetch weather immediately
+        if let location = locationManager.location {
+            fetchWeather(for: location)
+        }
+        // Otherwise request location and try again after delay
+        else {
+            locationManager.requestLocation()
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                 self.loadWeatherData()
             }
-            
-        case .failure(let error):
+        }
+    }
+    
+    private func fetchWeather(for location: CLLocation) {
+        WeatherService.shared.getWeather(for: location) { result in
             DispatchQueue.main.async {
-                self.errorMessage = "Failed to load clothing items: \(error.localizedDescription)"
-                self.isLoading = false
+                switch result {
+                case .success(let weather):
+                    self.weather = weather
+                    self.getOutfitRecommendation(weather: weather)
+                case .failure(let error):
+                    // If weather API fails, try with default weather
+                    self.errorMessage = "Weather service unavailable. Using default recommendation."
+                    self.useDefaultWeather()
+                }
             }
         }
-    }
-}
-
-private func loadWeatherData() {
-    guard let location = locationManager.location else {
-        // If location is not available yet, wait for it
-        locationManager.requestLocation()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-            self.loadWeatherData()
-        }
-        return
     }
     
-    WeatherService.shared.getWeather(for: location) { result in
-        DispatchQueue.main.async {
-            switch result {
-            case .success(let weather):
-                self.weather = weather
-                self.getOutfitRecommendation(weather: weather)
-            case .failure(let error):
-                self.errorMessage = "Failed to load weather: \(error.localizedDescription)"
-                self.isLoading = false
-            }
-        }
-    }
-}
-
-private func getOutfitRecommendation(weather: Weather) {
-    print("in get outfit rec", authManager.currentUser)
-    guard let userId = authManager.currentUser?.id else {
-        errorMessage = "User not authenticated"
-        isLoading = false
-        return
+    private func useDefaultWeather() {
+        // Create default weather (moderate temperature)
+        let defaultWeather = Weather(
+            temperature: 20.0,
+            condition: .cloudy,
+            humidity: 50,
+            windSpeed: 10,
+            location: "Default Location",
+            date: Date()
+        )
+        
+        self.weather = defaultWeather
+        self.getOutfitRecommendation(weather: defaultWeather)
     }
     
-    OutfitService.shared.getOutfitRecommendation(userId: userId, weather: weather, clothingItems: clothingItems) { result in
-        DispatchQueue.main.async {
-            self.isLoading = false
-            
-            switch result {
-            case .success(let outfit):
-                self.outfit = outfit
-            case .failure(let error):
-                self.errorMessage = "Failed to get outfit recommendation: \(error.localizedDescription)"
+    private func getOutfitRecommendation(weather: Weather) {
+        guard let userId = authManager.currentUser?.id else {
+            errorMessage = "User not authenticated"
+            isLoading = false
+            return
+        }
+        
+        OutfitService.shared.getOutfitRecommendation(
+            userId: userId,
+            weather: weather,
+            clothingItems: clothingItems
+        ) { result in
+            DispatchQueue.main.async {
+                self.isLoading = false
+                
+                switch result {
+                case .success(let outfit):
+                    self.outfit = outfit
+                case .failure(let error):
+                    self.errorMessage = "Outfit recommendation failed: \(error.localizedDescription)"
+                }
             }
         }
     }
-}
 
 private func refreshData() {
     loadData()
