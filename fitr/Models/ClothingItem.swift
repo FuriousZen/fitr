@@ -25,6 +25,8 @@ struct ClothingItem: Identifiable, Codable, Equatable {
     var name: String
     var createdAt: Date
     var weatherTags: [WeatherTag]
+    let styleTags: [StyleTag]
+
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -35,6 +37,7 @@ struct ClothingItem: Identifiable, Codable, Equatable {
         case name
         case createdAt = "created_at"
         case weatherTags = "weather_tags"
+        case styleTags = "style_tags"
     }
     
     // Implementation of Equatable protocol

@@ -1,4 +1,3 @@
-//
 //  Dash.swift
 //  fitr
 //
@@ -9,243 +8,74 @@ import SwiftUI
 import CoreLocation
 
 struct DashboardView: View {
-@EnvironmentObject var authManager: AuthenticationManager
-@StateObject private var locationManager = LocationManager()
-
-@State private var weather: Weather?
-@State private var outfit: Outfit?
-@State private var clothingItems: [ClothingItem] = []
-@State private var isLoading = true
-@State private var errorMessage: String?
-@State private var isWardrobeEmpty = false
-@State private var selectedTab = 0
+    @EnvironmentObject var authManager: AuthenticationManager
+    @StateObject private var locationManager = LocationManager()
     
-// Location retry tracking
-@State private var locationRetryCount = 0
-private let maxLocationRetries = 3
-
+    @State private var wardrobeLastUpdated = Date()
+    
+    @State private var weather: Weather?
+    @State private var outfit: Outfit?
+    @State private var clothingItems: [ClothingItem] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var isWardrobeEmpty = false
+    @State private var selectedTab = 0
+    @State private var selectedVibe: String?
+    @State private var vibeSelectionAppeared = false
+    
+    // Animation states
+    @State private var vibeButtonsAppeared = false
+    @State private var selectedVibeScale: CGFloat = 1.0
+    
+    // Location retry tracking
+    @State private var locationRetryCount = 0
+    private let maxLocationRetries = 3
+    
+    // Available vibes
+    private let vibes = ["Casual", "Formal", "Athletic", "Cozy", "Night Out"]
+    
     var body: some View {
         if authManager.isLoading {
-            // Show loading screen while auth state is being restored
-            VStack {
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: AppColors.davyGrey))
-                Text("Loading your profile...")
-                    .font(.headline)
-                    .foregroundColor(AppColors.davyGrey)
-                    .padding(.top)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(AppColors.peachSnaps.opacity(0.1).ignoresSafeArea())
+            LoadingView()
         } else {
-            TabView(selection: $selectedTab) {
-                // Home Tab
-                ScrollView {
-                    VStack(spacing: 20) {
-                        if isLoading {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: AppColors.davyGrey))
-                                .padding(.top, 100)
-                        } else {
-                            VStack(alignment: .leading, spacing: 20) {
-                                // Welcome section
-                                VStack(alignment: .leading, spacing: 5) {
-                                    Text("Hello, \(authManager.currentUser?.name ?? "there")!")
-                                        .font(.title)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(AppColors.davyGrey)
-                                    
-                                    if !isWardrobeEmpty {
-                                        Text("Here's your outfit for today")
-                                            .font(.subheadline)
-                                            .foregroundColor(AppColors.davyGrey.opacity(0.8))
-                                    }
-                                }
-                                .padding(.horizontal)
-                                
-                                if isWardrobeEmpty {
-                                    // Empty wardrobe welcome view
-                                    VStack(spacing: 25) {
-                                        // Illustration or icon
-                                        Image(systemName: "tshirt.fill")
-                                            .font(.system(size: 60))
-                                            .foregroundColor(AppColors.springRain)
-                                            .padding()
-                                            .background(
-                                                Circle()
-                                                    .fill(AppColors.moonMist.opacity(0.3))
-                                                    .frame(width: 120, height: 120)
-                                            )
-                                        
-                                        // Welcome message
-                                        VStack(spacing: 8) {
-                                            HStack(spacing: 2) {
-                                                Text("Welcome to ")
-                                                    .font(.title2)
-                                                    .fontWeight(.medium)
-                                                    .foregroundColor(AppColors.davyGrey)
-                                                
-                                                Text("fitr")
-                                                    .font(.system(.title2, design: .rounded))
-                                                    .fontWeight(.black)
-                                                    .foregroundColor(.white)
-                                                    .padding(.horizontal, 10)
-                                                    .padding(.vertical, 2)
-                                                    .background(
-                                                        LinearGradient(
-                                                            gradient: Gradient(colors: [AppColors.springRain, AppColors.springRain.opacity(0.7)]),
-                                                            startPoint: .leading,
-                                                            endPoint: .trailing
-                                                        )
-                                                        .clipShape(Capsule())
-                                                    )
-                                                    .shadow(color: AppColors.springRain.opacity(0.4), radius: 3, x: 0, y: 2)
-                                                
-                                                Text("!")
-                                                    .font(.title2)
-                                                    .fontWeight(.medium)
-                                                    .foregroundColor(AppColors.davyGrey)
-                                            }
-                                            
-                                            Text("Let's build your virtual wardrobe")
-                                                .font(.body)
-                                                .foregroundColor(AppColors.davyGrey.opacity(0.8))
-                                                .multilineTextAlignment(.center)
-                                        }
-                                        
-                                        // Call to action
-                                        Button(action: {
-                                            selectedTab = 1  // Switch to wardrobe tab
-                                        }) {
-                                            HStack {
-                                                Image(systemName: "plus.circle.fill")
-                                                Text("Add Your First Item")
-                                                    .fontWeight(.medium)
-                                            }
-                                            .padding(.vertical, 12)
-                                            .padding(.horizontal, 24)
-                                            .background(AppColors.springRain)
-                                            .foregroundColor(.white)
-                                            .cornerRadius(25)
-                                            .shadow(color: AppColors.springRain.opacity(0.3), radius: 10, x: 0, y: 5)
-                                        }
-                                        .padding(.top, 10)
-                                        
-                                        // Optional tip
-                                        Text("Tip: Add a few items to get personalized outfit recommendations")
-                                            .font(.caption)
-                                            .foregroundColor(AppColors.davyGrey.opacity(0.6))
-                                            .multilineTextAlignment(.center)
-                                            .padding(.horizontal, 40)
-                                            .padding(.top, 10)
-                                    }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 40)
-                                    .padding(.horizontal, 20)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 20)
-                                            .fill(Color.white)
-                                            .shadow(color: Color.black.opacity(0.05), radius: 15, x: 0, y: 5)
-                                    )
-                                    .padding(.horizontal)
-                                } else {
-                                    // Weather section
-                                    if let weather = weather {
-                                        WeatherView(weather: weather)
-                                            .padding(.horizontal)
-                                    } else {
-                                        Text("Weather data unavailable")
-                                            .font(.headline)
-                                            .foregroundColor(AppColors.davyGrey.opacity(0.6))
-                                            .frame(maxWidth: .infinity, alignment: .center)
-                                            .padding()
-                                    }
-                                    
-                                    // Outfit recommendation
-                                    if let outfit = outfit {
-                                        OutfitRecommendationView(outfit: outfit)
-                                            .padding(.horizontal)
-                                    } else {
-                                        Text("Outfit recommendation unavailable")
-                                            .font(.headline)
-                                            .foregroundColor(AppColors.davyGrey.opacity(0.6))
-                                            .frame(maxWidth: .infinity, alignment: .center)
-                                            .padding()
-                                    }
-                                }
-                                
-                                // Quick actions
-                                VStack(alignment: .leading, spacing: 10) {
-                                    Text("Quick Actions")
-                                        .font(.headline)
-                                        .foregroundColor(AppColors.davyGrey)
-                                        .padding(.horizontal)
-                                    
-                                    HStack(spacing: 15) {
-                                        QuickActionButton(
-                                            icon: "camera.fill",
-                                            title: "Add Clothing",
-                                            color: AppColors.springRain
-                                        ) {
-                                            selectedTab = 1
-                                        }
-                                        
-                                        QuickActionButton(
-                                            icon: "arrow.clockwise",
-                                            title: "Refresh",
-                                            color: AppColors.lightPink
-                                        ) {
-                                            refreshData()
-                                        }
-                                    }
-                                    .padding(.horizontal)
-                                }
-                                
-                                if let errorMessage = errorMessage, !isWardrobeEmpty {
-                                    Text(errorMessage)
-                                        .font(.caption)
-                                        .foregroundColor(.red)
-                                        .padding()
-                                }
-                            }
-                        }
-                    }
-                    .padding(.vertical)
-                }
-                .background(AppColors.peachSnaps.opacity(0.1).ignoresSafeArea())
-                .tabItem {
-                    Label("Home", systemImage: "house.fill")
-                }
-                .tag(0)
-                
-                // Wardrobe Tab
-                WardrobeView()
-                    .environmentObject(authManager)
-                    .tabItem {
-                        Label("Wardrobe", systemImage: "tshirt.fill")
-                    }
-                    .tag(1)
-                
-                // Profile Tab
-                ProfileView()
-                    .environmentObject(authManager)
-                    .tabItem {
-                        Label("Profile", systemImage: "person.fill")
-                    }
-                    .tag(2)
-            }
-            .accentColor(AppColors.davyGrey)
+            MainTabView(
+                selectedTab: $selectedTab,
+                isLoading: $isLoading,
+                weather: $weather,
+                outfit: $outfit,
+                isWardrobeEmpty: $isWardrobeEmpty,
+                selectedVibe: $selectedVibe,
+                vibeSelectionAppeared: $vibeSelectionAppeared,
+                vibeButtonsAppeared: $vibeButtonsAppeared,
+                selectedVibeScale: $selectedVibeScale,
+                errorMessage: $errorMessage,
+                vibes: vibes,
+                loadData: loadData,
+                getOutfitForVibe: getOutfitForVibe,
+                vibeColor: vibeColor,
+                vibeIcon: vibeIcon
+            )
+            .environmentObject(authManager)
             .onAppear {
                 loadData()
             }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WardrobeUpdated"))) { _ in
+                       // Refresh data when wardrobe is updated
+                       wardrobeLastUpdated = Date()
+                       loadData()
+                   }
         }
     }
-
+    
     private func loadData() {
         isLoading = true
         errorMessage = nil
         isWardrobeEmpty = false
         locationRetryCount = 0
+        selectedVibe = nil
+        outfit = nil
+        vibeSelectionAppeared = false
+        vibeButtonsAppeared = false
         
         guard let userId = authManager.currentUser?.id else {
             errorMessage = "User not authenticated"
@@ -274,8 +104,31 @@ private let maxLocationRetries = 3
             }
         }
     }
-
+    
     private func loadWeatherData() {
+        // Check location authorization status first
+        switch locationManager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            // Continue with location-based weather
+            continueWithLocationWeather()
+        case .denied, .restricted:
+            // User denied location access, use default weather
+            self.errorMessage = "Location access denied. Using default weather."
+            self.useDefaultWeather()
+        case .notDetermined:
+            // Wait for user to respond to permission dialog
+            locationManager.requestLocation()
+            
+            // Check again after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                self.loadWeatherData()
+            }
+        @unknown default:
+            self.useDefaultWeather()
+        }
+    }
+
+    private func continueWithLocationWeather() {
         // If we've exceeded retry attempts, use default weather
         guard locationRetryCount < maxLocationRetries else {
             self.useDefaultWeather()
@@ -293,18 +146,17 @@ private let maxLocationRetries = 3
             locationManager.requestLocation()
             
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                self.loadWeatherData()
+                self.continueWithLocationWeather()
             }
         }
     }
-    
     private func fetchWeather(for location: CLLocation) {
         WeatherService.shared.getWeather(for: location) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let weather):
                     self.weather = weather
-                    self.getOutfitRecommendation(weather: weather)
+                    self.isLoading = false
                 case .failure(let error):
                     // If weather API fails, try with default weather
                     self.errorMessage = "Weather service unavailable. Using default recommendation."
@@ -326,24 +178,47 @@ private let maxLocationRetries = 3
         )
         
         self.weather = defaultWeather
-        self.getOutfitRecommendation(weather: defaultWeather)
+        self.isLoading = false
     }
     
-    private func getOutfitRecommendation(weather: Weather) {
-        guard let userId = authManager.currentUser?.id else {
-            errorMessage = "User not authenticated"
-            isLoading = false
+    private func vibeIcon(for vibe: String) -> String {
+        switch vibe {
+        case "Casual": return "tshirt"
+        case "Formal": return "briefcase"
+        case "Athletic": return "figure.run"
+        case "Cozy": return "house"
+        case "Night Out": return "moon.stars"
+        default: return "tshirt"
+        }
+    }
+    
+    private func vibeColor(for vibe: String) -> Color {
+        switch vibe {
+        case "Casual": return AppColors.springRain
+        case "Formal": return AppColors.davyGrey
+        case "Athletic": return Color.blue
+        case "Cozy": return AppColors.lightPink
+        case "Night Out": return Color.purple
+        default: return AppColors.springRain
+        }
+    }
+    
+    private func getOutfitForVibe(vibe: String) {
+        guard let userId = authManager.currentUser?.id, let weather = weather else {
+            errorMessage = "Cannot generate outfit recommendation"
             return
         }
         
+        // Clear previous outfit and show loading state
+        outfit = nil
+        
         OutfitService.shared.getOutfitRecommendation(
             userId: userId,
+            vibe: vibe,
             weather: weather,
             clothingItems: clothingItems
         ) { result in
             DispatchQueue.main.async {
-                self.isLoading = false
-                
                 switch result {
                 case .success(let outfit):
                     self.outfit = outfit
@@ -353,62 +228,5 @@ private let maxLocationRetries = 3
             }
         }
     }
-
-private func refreshData() {
-    loadData()
-}
-}
-
-struct QuickActionButton: View {
-let icon: String
-let title: String
-let color: Color
-let action: () -> Void
-
-var body: some View {
-    Button(action: action) {
-        VStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 24))
-                .foregroundColor(.white)
-            
-            Text(title)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.white)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
-        .background(color)
-        .cornerRadius(12)
-    }
-}
-}
-
-class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
-private let locationManager = CLLocationManager()
-@Published var location: CLLocation?
-
-override init() {
-    super.init()
-    locationManager.delegate = self
-    locationManager.desiredAccuracy = kCLLocationAccuracyKilometer
-    locationManager.requestWhenInUseAuthorization()
-    locationManager.startUpdatingLocation()
-}
-
-func requestLocation() {
-    locationManager.requestLocation()
-}
-
-func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-    if let location = locations.last {
-        self.location = location
-        locationManager.stopUpdatingLocation()
-    }
-}
-
-func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-    print("Location manager failed with error: \(error.localizedDescription)")
-}
+    
 }

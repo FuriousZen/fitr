@@ -1,4 +1,3 @@
-//
 //  OutfitService.swift
 //  fitr
 //
@@ -10,28 +9,29 @@ import Foundation
 class OutfitService {
     static let shared = OutfitService()
     
-    func getOutfitRecommendation(userId: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
+    // Updated to always require a vibe
+    func getOutfitRecommendation(userId: String, vibe: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
         // Always try to get recommendation from backend first
-        getRecommendationFromBackend(userId: userId, weather: weather, clothingItems: clothingItems) { result in
+        getRecommendationFromBackend(userId: userId, vibe: vibe, weather: weather, clothingItems: clothingItems) { result in
             switch result {
             case .success(let outfit):
                 completion(.success(outfit))
             case .failure(let error):
                 // If backend fails, fallback to local recommendation
                 print("Backend recommendation failed: \(error.localizedDescription). Falling back to local recommendation.")
-                self.getLocalRecommendation(userId: userId, weather: weather, clothingItems: clothingItems, completion: completion)
+                self.getLocalRecommendation(userId: userId, vibe: vibe, weather: weather, clothingItems: clothingItems, completion: completion)
             }
         }
     }
     
-    private func getRecommendationFromBackend(userId: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
+    private func getRecommendationFromBackend(userId: String, vibe: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
         guard let url = URL(string: "\(APIEndpoints.baseURL)\(APIEndpoints.outfitRecommendationEndpoint)") else {
             completion(.failure(NSError(domain: "OutfitService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
             return
         }
         
-        // Prepare request body
-        let requestBody = OutfitRequestBody(userId: userId, weather: weather, clothingItems: clothingItems)
+        // Prepare request body with vibe
+        let requestBody = OutfitRequestBody(userId: userId, vibe: vibe, weather: weather, clothingItems: clothingItems)
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -68,8 +68,8 @@ class OutfitService {
         }.resume()
     }
     
-    private func getLocalRecommendation(userId: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
-        // Simple local recommendation logic based on weather
+    private func getLocalRecommendation(userId: String, vibe: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
+        // Simple local recommendation logic based on weather and vibe
         guard !clothingItems.isEmpty else {
             completion(.failure(NSError(domain: "OutfitService", code: 2, userInfo: [NSLocalizedDescriptionKey: "No clothing items available"])))
             return
@@ -102,12 +102,41 @@ class OutfitService {
         }
         
         // Filter clothing items that match the appropriate weather tags
-        let filteredItems = clothingItems.filter { item in
+        var filteredItems = clothingItems.filter { item in
             return item.weatherTags.contains { appropriateWeatherTags.contains($0) }
         }
         
         // If no matching items, use all items
-        let itemsToUse = filteredItems.isEmpty ? clothingItems : filteredItems
+        if filteredItems.isEmpty {
+            filteredItems = clothingItems
+        }
+        
+        // Further filter by style tags based on vibe
+        var styleTagsForVibe: [StyleTag] = []
+        
+        switch vibe.lowercased() {
+        case "casual":
+            styleTagsForVibe = [.casual, .comfortable, .everyday]
+        case "formal":
+            styleTagsForVibe = [.formal, .business, .elegant]
+        case "athletic":
+            styleTagsForVibe = [.athletic, .sporty, .comfortable]
+        case "cozy":
+            styleTagsForVibe = [.comfortable, .casual, .warm]
+        case "night out":
+            styleTagsForVibe = [.elegant, .trendy, .stylish]
+        default:
+            // Default to casual
+            styleTagsForVibe = [.casual, .comfortable]
+        }
+        
+        // Try to filter by style tags
+        let styleFilteredItems = filteredItems.filter { item in
+            return item.styleTags.contains { styleTagsForVibe.contains($0) }
+        }
+        
+        // Use style filtered items if available, otherwise use weather filtered items
+        let itemsToUse = styleFilteredItems.isEmpty ? filteredItems : styleFilteredItems
         
         // Select one item of each necessary type
         var selectedItems: [ClothingItem] = []
@@ -154,8 +183,15 @@ class OutfitService {
             selectedItems.append(contentsOf: Array(remainingItems.prefix(2 - selectedItems.count)))
         }
         
-        // Create description based on selected items
-        let description = createOutfitDescription(items: selectedItems, weather: weather)
+        // Add accessories based on vibe
+        if vibe.lowercased() == "formal" || vibe.lowercased() == "night out" {
+            if let accessory = itemsToUse.first(where: { $0.type == .accessory }) {
+                selectedItems.append(accessory)
+            }
+        }
+        
+        // Create description based on selected items and vibe
+        let description = createOutfitDescriptionWithVibe(items: selectedItems, vibe: vibe, weather: weather)
         
         // Create outfit
         let outfit = Outfit(
@@ -164,16 +200,17 @@ class OutfitService {
             items: selectedItems,
             weather: weather,
             createdAt: Date(),
-            description: description
+            description: description,
+            vibe: vibe
         )
         
         completion(.success(outfit))
     }
     
-    private func createOutfitDescription(items: [ClothingItem], weather: Weather) -> String {
+    private func createOutfitDescriptionWithVibe(items: [ClothingItem], vibe: String, weather: Weather) -> String {
         let itemDescriptions = items.map { "\($0.color) \($0.type.rawValue.lowercased())" }
         
-        var description = "For today's weather (\(Int(weather.temperature))°C, \(weather.condition.rawValue)), "
+        var description = "For a \(vibe.lowercased()) vibe in today's weather (\(Int(weather.temperature))°C, \(weather.condition.rawValue)), "
         
         if itemDescriptions.isEmpty {
             description += "I couldn't find suitable items in your wardrobe."
@@ -185,12 +222,29 @@ class OutfitService {
             description += "I recommend wearing your \(otherItems) and \(lastItem)."
         }
         
+        // Add vibe-specific tips
+        switch vibe.lowercased() {
+        case "casual":
+            description += " This outfit is perfect for a relaxed day while staying comfortable and stylish."
+        case "formal":
+            description += " This combination creates a polished look suitable for professional settings or special occasions."
+        case "athletic":
+            description += " This outfit provides the comfort and flexibility you need for an active day."
+        case "cozy":
+            description += " This ensemble prioritizes comfort while keeping you warm and looking put-together."
+        case "night out":
+            description += " This outfit strikes the perfect balance between style and comfort for your evening plans."
+        default:
+            break
+        }
+        
         return description
     }
 }
 
 struct OutfitRequestBody: Codable {
     let userId: String
+    let vibe: String
     let weather: Weather
     let clothingItems: [ClothingItem]
 }

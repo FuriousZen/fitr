@@ -1,0 +1,41 @@
+{
+  "configurations" : [
+    {
+      "id" : "7F05CD62-DD0A-492F-996E-AA941100D6E1",
+      "name" : "Test Scheme Action",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "locationScenario" : {
+      "identifier" : "New York, NY, USA",
+      "referenceType" : "built-in"
+    },
+    "targetForVariableExpansion" : {
+      "containerPath" : "container:fitr.xcodeproj",
+      "identifier" : "94014E4C2D984BBE001D58C5",
+      "name" : "fitr"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:fitr.xcodeproj",
+        "identifier" : "94014E5E2D984BC0001D58C5",
+        "name" : "fitrTests"
+      }
+    },
+    {
+      "parallelizable" : true,
+      "target" : {
+        "containerPath" : "container:fitr.xcodeproj",
+        "identifier" : "94014E682D984BC0001D58C5",
+        "name" : "fitrUITests"
+      }
+    }
+  ],
+  "version" : 1
+}
