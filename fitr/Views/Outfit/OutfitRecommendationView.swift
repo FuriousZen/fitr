@@ -33,7 +33,11 @@ struct OutfitRecommendationView: View {
                 outfitView(outfit: outfit)
             }
         }
-        .onAppear(perform: loadOutfitRecommendation)
+        .onAppear{
+            if outfit == nil {
+                   loadOutfitRecommendation()
+               }
+        }
         .toast(isPresented: $showToast, message: toastMessage, isSuccess: isSuccessToast)
     }
     
@@ -265,6 +269,7 @@ struct OutfitRecommendationView: View {
     }
     
     private func loadOutfitRecommendation() {
+        print("loading new outfit")
         isLoading = true
         errorMessage = nil
         

@@ -131,7 +131,7 @@ struct LaundryView: View {
                     .font(.headline)
                     .foregroundColor(AppColors.davyGrey)
                 
-                Text("Mark items as dirty to add them here")
+                Text("Mark items as dirty to add them here so they aren't mixed in with your outfits")
                     .font(.subheadline)
                     .foregroundColor(AppColors.davyGrey.opacity(0.8))
                     .multilineTextAlignment(.center)

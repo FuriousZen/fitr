@@ -37,13 +37,13 @@ struct ToastModifier: ViewModifier {
     let isSuccess: Bool
     
     func body(content: Content) -> some View {
-        ZStack {
+        ZStack (alignment: .top){
             content
             
             VStack {
                 if showToast {
                     ToastView(message: message, isSuccess: isSuccess)
-                        .padding(.top, 10)
+                        .padding(.top, 50)
                         .animation(.spring(), value: showToast)
                 }
                 Spacer()

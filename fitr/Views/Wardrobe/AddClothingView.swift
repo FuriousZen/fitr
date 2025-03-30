@@ -1,8 +1,6 @@
 import SwiftUI
 import FirebaseStorage
-
-
-
+import FirebaseVertexAI
 
 struct AddClothingView: View {
     @Environment(\.presentationMode) var presentationMode
@@ -27,6 +25,7 @@ struct AddClothingView: View {
     @State private var aiSuggestedType: ClothingType?
     @State private var aiSuggestedColor: String?
     @State private var aiSuggestedStyleTags: [StyleTag]?
+    @State private var aiSuggestedWeatherTags: [WeatherTag]?
     @State private var isUploading = false
     @State private var uploadTask: StorageUploadTask?
     
@@ -34,6 +33,9 @@ struct AddClothingView: View {
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var isSuccessToast = true
+    
+    // Vertex AI classifier
+    private let clothingClassifier = ClothingClassifier()
     
     // MARK: - Body
     var body: some View {
@@ -179,48 +181,82 @@ struct AddClothingView: View {
                 .padding()
             }
             
-            if showAIClassificationResults, let suggestedType = aiSuggestedType, let suggestedColor = aiSuggestedColor {
+            if showAIClassificationResults {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("AI Analysis Results")
-                        .font(.headline)
-                        .foregroundColor(AppColors.davyGrey)
-                    
                     HStack {
-                        Text("Type: \(suggestedType.rawValue)")
-                        Spacer()
-                        Button("Apply") {
-                            clothingType = suggestedType
-                        }
-                        .font(.caption)
-                        .foregroundColor(AppColors.springRain)
+                        Image(systemName: "wand.and.stars")
+                        Text("AI Analysis Results")
+                            .font(.headline)
+                            .foregroundColor(AppColors.davyGrey)
                     }
                     
-                    HStack {
+                    if let suggestedType = aiSuggestedType {
+                        Text("Type: \(suggestedType.rawValue)")
+                            .lineLimit(1)
+                    }
+                    
+                    if let suggestedColor = aiSuggestedColor {
                         Text("Color: \(suggestedColor)")
-                        Spacer()
-                        Button("Apply") {
-                            clothingColor = suggestedColor
-                        }
-                        .font(.caption)
-                        .foregroundColor(AppColors.springRain)
+                            .lineLimit(1)
+                    }
+                    
+                    if let suggestedWeatherTags = aiSuggestedWeatherTags, !suggestedWeatherTags.isEmpty {
+                        Text("Weather: \(suggestedWeatherTags.map { $0.rawValue }.joined(separator: ", "))")
+                            .lineLimit(2)
                     }
                     
                     if let suggestedStyleTags = aiSuggestedStyleTags, !suggestedStyleTags.isEmpty {
-                        HStack(alignment: .top) {
-                            Text("Style: \(suggestedStyleTags.map { $0.rawValue }.joined(separator: ", "))")
-                                .lineLimit(2)
-                            Spacer()
-                            Button("Apply") {
-                                selectedStyleTags = Set(suggestedStyleTags)
-                            }
-                            .font(.caption)
-                            .foregroundColor(AppColors.springRain)
-                        }
+                        Text("Style: \(suggestedStyleTags.map { $0.rawValue }.joined(separator: ", "))")
+                            .lineLimit(2)
                     }
+                    
+                    Button(action: applyAllAISuggestions) {
+                        Text("Apply All Suggestions")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(AppColors.springRain)
+                    .padding(.top, 8)
                 }
                 .padding()
                 .background(AppColors.moonMist.opacity(0.3))
                 .cornerRadius(10)
+            }
+        }
+    }
+    private func applyAllAISuggestions() {
+        // Apply type suggestion
+        if let suggestedType = aiSuggestedType {
+            clothingType = suggestedType
+        }
+        
+        // Apply color suggestion
+        if let suggestedColor = aiSuggestedColor {
+            clothingColor = suggestedColor
+        }
+        if let suggestedColor = aiSuggestedColor, let suggestedType = aiSuggestedType {
+            clothingName = "\(suggestedColor) \(suggestedType)"
+           }
+        // Apply weather tags suggestions
+        if let suggestedWeatherTags = aiSuggestedWeatherTags, !suggestedWeatherTags.isEmpty {
+            selectedWeatherTags = Set(suggestedWeatherTags)
+        }
+        
+        // Apply style tags suggestions
+        if let suggestedStyleTags = aiSuggestedStyleTags, !suggestedStyleTags.isEmpty {
+            selectedStyleTags = Set(suggestedStyleTags)
+        }
+        
+        // Show success toast
+        toastMessage = "All suggestions applied!"
+        isSuccessToast = true
+        showToast = true
+        
+        // Hide toast after 2 seconds
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                self.showToast = false
             }
         }
     }
@@ -366,6 +402,7 @@ struct AddClothingView: View {
             aiSuggestedType = nil
             aiSuggestedColor = nil
             aiSuggestedStyleTags = nil
+            aiSuggestedWeatherTags = nil
         }
     }
     
@@ -380,113 +417,72 @@ struct AddClothingView: View {
         isClassifying = true
         showAIClassificationResults = false
         
-        guard let imageData = image.jpegData(compressionQuality: 0.7) else {
-            DispatchQueue.main.async {
-                self.isClassifying = false
-                self.errorMessage = "Failed to process image"
-            }
-            return
-        }
-        
-        let base64Image = imageData.base64EncodedString()
-        callClothingClassificationAPIWithBase64(base64Image: base64Image)
-    }
-
-    private func callClothingClassificationAPIWithBase64(base64Image: String) {
-        guard let url = URL(string: "\(APIEndpoints.baseURL)\(APIEndpoints.clothingClassificationEndpoint)") else {
-            DispatchQueue.main.async {
-                self.isClassifying = false
-                self.errorMessage = "Invalid API URL"
-            }
-            return
-        }
-        
-        let requestBody = ["image_base64": base64Image]
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
-        } catch {
-            DispatchQueue.main.async {
-                self.isClassifying = false
-                self.errorMessage = "Failed to prepare request: \(error.localizedDescription)"
-            }
-            return
-        }
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
+        clothingClassifier.classifyClothing(image) { result in
             DispatchQueue.main.async {
                 self.isClassifying = false
                 
-                if let error = error {
-                    self.errorMessage = "Classification failed: \(error.localizedDescription)"
-                    return
-                }
-                
-                guard let data = data else {
-                    self.errorMessage = "No data received from classification API"
-                    return
-                }
-                
-                do {
-                    if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                        if let typeString = json["type"] as? String,
-                           let type = ClothingType.allCases.first(where: { $0.rawValue.lowercased() == typeString.lowercased() }) {
-                            self.aiSuggestedType = type
-                        }
+                switch result {
+                case .success(let classification):
+                    // Process the classification result
+                    if let type = ClothingType.allCases.first(where: { $0.rawValue.lowercased() == classification.type.lowercased() }) {
+                        self.aiSuggestedType = type
+                    }
+                    
+                    self.aiSuggestedColor = classification.color
+                    
+                    let suggestedStyles = classification.styleTags.compactMap { styleString in
+                        return StyleTag.allCases.first { $0.rawValue.lowercased() == styleString.lowercased() }
+                    }
+                    
+                    if !suggestedStyles.isEmpty {
+                        self.aiSuggestedStyleTags = suggestedStyles
+                    }
+                    
+                    // Update weather tags suggestion
+                    let suggestedWeatherTags = classification.weatherTags.compactMap { weatherString in
+                        return WeatherTag.allCases.first { $0.rawValue.lowercased() == weatherString.lowercased() }
+                    }
+                    
+                    if !suggestedWeatherTags.isEmpty {
+                        self.aiSuggestedWeatherTags = suggestedWeatherTags
+                    }
+                    
+                    if self.aiSuggestedType != nil || self.aiSuggestedColor != nil ||
+                       self.aiSuggestedStyleTags != nil || self.aiSuggestedWeatherTags != nil {
+                        self.showAIClassificationResults = true
                         
-                        if let color = json["color"] as? String {
-                            self.aiSuggestedColor = color
-                        }
+                        // Show success toast for AI analysis
+                        self.toastMessage = "AI analysis complete!"
+                        self.isSuccessToast = true
+                        self.showToast = true
                         
-                        if let styleStrings = json["style_tags"] as? [String] {
-                            let suggestedStyles = styleStrings.compactMap { styleString in
-                                return StyleTag.allCases.first { $0.rawValue.lowercased() == styleString.lowercased() }
-                            }
-                            
-                            if !suggestedStyles.isEmpty {
-                                self.aiSuggestedStyleTags = suggestedStyles
+                        // Hide toast after 2 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                            withAnimation {
+                                self.showToast = false
                             }
                         }
+                    } else {
+                        self.errorMessage = "AI couldn't identify the clothing properly"
                         
-                        if self.aiSuggestedType != nil || self.aiSuggestedColor != nil || self.aiSuggestedStyleTags != nil {
-                            self.showAIClassificationResults = true
-                            
-                            // Show success toast for AI analysis
-                            self.toastMessage = "AI analysis complete!"
-                            self.isSuccessToast = true
-                            self.showToast = true
-                            
-                            // Hide toast after 2 seconds
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                withAnimation {
-                                    self.showToast = false
-                                }
-                            }
-                        } else {
-                            self.errorMessage = "AI couldn't identify the clothing properly"
-                            
-                            // Show error toast
-                            self.toastMessage = "AI analysis failed"
-                            self.isSuccessToast = false
-                            self.showToast = true
-                            
-                            // Hide toast after 3 seconds
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
-                                withAnimation {
-                                    self.showToast = false
-                                }
+                        // Show error toast
+                        self.toastMessage = "AI analysis failed"
+                        self.isSuccessToast = false
+                        self.showToast = true
+                        
+                        // Hide toast after 3 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                            withAnimation {
+                                self.showToast = false
                             }
                         }
                     }
-                } catch {
-                    self.errorMessage = "Failed to parse classification response: \(error.localizedDescription)"
+                    
+                case .failure(let error):
+                    self.errorMessage = "Classification failed: \(error.localizedDescription)"
                     
                     // Show error toast
-                    self.toastMessage = "Failed to process AI results"
+                    self.toastMessage = "AI analysis failed"
                     self.isSuccessToast = false
                     self.showToast = true
                     
@@ -498,7 +494,7 @@ struct AddClothingView: View {
                     }
                 }
             }
-        }.resume()
+        }
     }
     
     private func saveClothingItem() {
@@ -576,6 +572,10 @@ struct AddClothingView: View {
                 
                 switch result {
                 case .success:
+                    // Show success toast
+                    self.toastMessage = "Item saved successfully!"
+                    self.isSuccessToast = true
+                    self.showToast = true
                     
                     // Hide toast after 2 seconds and dismiss
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
@@ -677,33 +677,20 @@ struct StyleTagButton: View {
 }
 
 struct WeatherTagButton: View {
-    
     let tag: WeatherTag
-    
     let isSelected: Bool
-    
     let action: () -> Void
     
     var body: some View {
-        
         Button(action: action) {
-            
             Text(tag.rawValue)
-            
                 .font(.subheadline)
-            
                 .fontWeight(isSelected ? .semibold : .regular)
-            
                 .padding(.vertical, 8)
-            
                 .padding(.horizontal, 16)
-            
                 .background(isSelected ? AppColors.lightPink : AppColors.moonMist.opacity(0.5))
-            
                 .foregroundColor(isSelected ? .white : AppColors.davyGrey)
-            
                 .cornerRadius(20)
-            
         }
     }
 }

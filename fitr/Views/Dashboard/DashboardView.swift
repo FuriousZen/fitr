@@ -31,9 +31,6 @@ struct DashboardView: View {
     @State private var locationRetryCount = 0
     private let maxLocationRetries = 3
     
-    // Outfit caching
-    @State private var outfitCache: [String: Outfit] = [:]
-    
     // Available vibes
     private let vibes = ["Casual", "Formal", "Athletic", "Cozy", "Night Out"]
     
@@ -63,7 +60,7 @@ struct DashboardView: View {
                 loadData()
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WardrobeUpdated"))) { notification in
-                print(weather, outfit, isWardrobeEmpty, selectedVibe, "hi")
+
                 // Check the operation type
                 if let operation = notification.userInfo?["operation"] as? String {
                     switch operation {
@@ -78,13 +75,11 @@ struct DashboardView: View {
                         // For other operations (add, delete, etc.), reload everything
                         wardrobeLastUpdated = Date()
                         // Clear the cache when wardrobe changes
-                        outfitCache.removeAll()
                         loadData()
                     }
                 } else {
                     // If no operation specified, reload everything (backward compatibility)
                     wardrobeLastUpdated = Date()
-                    outfitCache.removeAll()
                     loadData()
                 }
             }
@@ -92,25 +87,14 @@ struct DashboardView: View {
     }
     
     private func loadData() {
-        // If we already have weather data and it's recent, don't reload everything
-        print(weather, outfit, isWardrobeEmpty, selectedVibe)
-        if weather != nil && outfit != nil && !isWardrobeEmpty && selectedVibe != nil {
-            
-            isLoading = false
-            return
-        }
-        
         isLoading = true
         errorMessage = nil
-        
-        // Only reset these if we're actually reloading
-        if isWardrobeEmpty || weather == nil {
-            isWardrobeEmpty = false
-            locationRetryCount = 0
-            vibeSelectionAppeared = false
-            vibeButtonsAppeared = false
-        }
-        
+        isWardrobeEmpty = false
+        locationRetryCount = 0
+         selectedVibe = nil
+         outfit = nil
+         vibeSelectionAppeared = false
+         vibeButtonsAppeared = false
         
         guard let userId = authManager.currentUser?.id else {
             errorMessage = "User not authenticated"
@@ -153,7 +137,7 @@ struct DashboardView: View {
     private func loadWeatherData() {
         isLoading = true
         
-        // Use Charlottesville, Virginia as the fixed location
+        // Use Charlottesville as the fixed location cause can't use location on simulator
         WeatherService.shared.getWeatherForCharlottesville { result in
             DispatchQueue.main.async {
                 switch result {
@@ -213,12 +197,6 @@ struct DashboardView: View {
             return
         }
         
-        // Check if we have a cached outfit for this vibe
-        if let cachedOutfit = outfitCache[vibe] {
-            self.outfit = cachedOutfit
-            return
-        }
-        
         // Clear previous outfit and show loading state
         outfit = nil
         
@@ -233,7 +211,6 @@ struct DashboardView: View {
                 case .success(let outfit):
                     self.outfit = outfit
                     // Cache the outfit
-                    self.outfitCache[vibe] = outfit
                 case .failure(let error):
                     self.errorMessage = "Outfit recommendation failed: \(error.localizedDescription)"
                 }
@@ -246,11 +223,6 @@ struct DashboardView: View {
         if var currentOutfit = outfit {
             currentOutfit.items.removeAll(where: { $0.id == itemId })
             outfit = currentOutfit
-            
-            // Also update the cache
-            if let vibe = selectedVibe {
-                outfitCache[vibe] = currentOutfit
-            }
         }
         
         // Remove the item from clothingItems as well

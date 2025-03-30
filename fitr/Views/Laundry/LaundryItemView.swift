@@ -78,7 +78,7 @@ struct LaundryItemView: View {
             ActionSheet(
                 title: Text(item.name),
                 buttons: [
-                    .default(Text("Wash and Return to Wardrobe")) {
+                    .default(Text("Send back to Wardrobe")) {
                         onWash()
                     },
                     .cancel()

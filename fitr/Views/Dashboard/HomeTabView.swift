@@ -198,6 +198,13 @@ struct HomeTabView: View {
                 .opacity(vibeSelectionAppeared ? 1 : 0)
                 .offset(y: vibeSelectionAppeared ? 0 : 20)
                 .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1), value: vibeSelectionAppeared)
+            Text("i can choose an outfit for you 🤫")
+                .font(.caption)
+                .foregroundColor(AppColors.davyGrey)
+                .padding(.horizontal)
+                .opacity(vibeSelectionAppeared ? 1 : 0)
+                .offset(y: vibeSelectionAppeared ? 0 : 10)
+                .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.2), value: vibeSelectionAppeared)
             
             // Vibe cards in a horizontal scroll
             ScrollView(.horizontal, showsIndicators: false) {
@@ -259,7 +266,8 @@ struct HomeTabView: View {
     private var outfitRecommendationSection: some View {
         Group {
             if let selectedVibe = selectedVibe, let weather = weather {
-                OutfitRecommendationView(weather: weather, vibe: selectedVibe)
+                    OutfitRecommendationView(weather: weather, vibe: selectedVibe)
+                    .id(selectedVibe)
                     .padding(.horizontal)
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
                     .animation(.spring(), value: UUID())
