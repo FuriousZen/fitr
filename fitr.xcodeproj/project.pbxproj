@@ -10,6 +10,7 @@
 		94014E872D985100001D58C5 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 94014E862D985100001D58C5 /* FirebaseAuth */; };
 		94014E892D985100001D58C5 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 94014E882D985100001D58C5 /* FirebaseFirestore */; };
 		94014E8B2D985100001D58C5 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 94014E8A2D985100001D58C5 /* FirebaseStorage */; };
+		941A2BB42D999FE8001AD725 /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = 941A2BB32D999FE4001AD725 /* .gitignore */; };
 		94494AD02D990584009DFA46 /* FirebaseVertexAI in Frameworks */ = {isa = PBXBuildFile; productRef = 94494ACF2D990584009DFA46 /* FirebaseVertexAI */; };
 		944BC4C62D986A6000484019 /* Kingfisher in Frameworks */ = {isa = PBXBuildFile; productRef = 944BC4C52D986A6000484019 /* Kingfisher */; };
 /* End PBXBuildFile section */
@@ -35,6 +36,7 @@
 		94014E4D2D984BBE001D58C5 /* fitr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = fitr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		94014E5F2D984BC0001D58C5 /* fitrTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = fitrTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		94014E692D984BC0001D58C5 /* fitrUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = fitrUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		941A2BB32D999FE4001AD725 /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -88,6 +90,7 @@
 		94014E442D984BBE001D58C5 = {
 			isa = PBXGroup;
 			children = (
+				941A2BB32D999FE4001AD725 /* .gitignore */,
 				94014E4F2D984BBE001D58C5 /* fitr */,
 				94014E622D984BC0001D58C5 /* fitrTests */,
 				94014E6C2D984BC0001D58C5 /* fitrUITests */,
@@ -230,6 +233,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				941A2BB42D999FE8001AD725 /* .gitignore in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
