@@ -46,6 +46,10 @@ class OutfitService {
             completion(.failure(NSError(domain: "OutfitService", code: 2, userInfo: [NSLocalizedDescriptionKey: "No clean clothing items available"])))
             return
         }
+        if cleanItems.count == 1 {
+            completion(.failure(NSError(domain: "OutfitService", code: 6, userInfo: [NSLocalizedDescriptionKey: "Not enough clean clothing items to create an outfit"])))
+            return
+        }
         
         // Generate outfit with AI
         generateOutfitWithAI(userId: userId, vibe: vibe, weather: weather, clothingItems: cleanItems) { result in
@@ -71,11 +75,39 @@ class OutfitService {
                     // Parse the AI response
                     let decoder = JSONDecoder()
                     let aiResponse = try decoder.decode(OutfitAIResponse.self, from: jsonData)
+                    print("AI RES", aiResponse)
+                    if aiResponse.selectedItemIds.isEmpty {
+                        throw NSError(domain: "OutfitService", code: 5, userInfo: [NSLocalizedDescriptionKey: "No suitable outfit could be created with current wardrobe"])
+                    }
+                    var selectedItemIds = Set(aiResponse.selectedItemIds)
                     
-                    // Get the selected items based on the AI's recommendation
-                    let selectedItemIds = Set(aiResponse.selectedItemIds)
+                    // Ensure only one item per category is included
+                    var selectedTypes: [ClothingType: ClothingItem] = [:]
+                    for item in clothingItems where selectedItemIds.contains(item.id) {
+                        if selectedTypes[item.type] == nil {
+                            selectedTypes[item.type] = item
+                        }
+                    }
+                    let mutuallyExclusiveTypes: [[ClothingType]] = [
+                        [.tShirt, .shirt], // One top
+                        [.pants, .shorts]  // One bottom
+                    ]
+                    for category in mutuallyExclusiveTypes {
+                        for item in clothingItems where category.contains(item.type) {
+                            if selectedTypes.keys.contains(where: { category.contains($0) }) {
+                                continue
+                            }
+                            selectedTypes[item.type] = item
+                        }
+                    }
+
+                    // Add selected items to the set
+                    selectedItemIds = Set(selectedTypes.values.map { $0.id })
+                    for (_, item) in selectedTypes {
+                        selectedItemIds.insert(item.id)
+                    }
                     let selectedItems = clothingItems.filter { selectedItemIds.contains($0.id) }
-                    
+                                        
                     // Create the outfit
                     let outfit = Outfit(
                         id: UUID().uuidString,
@@ -144,7 +176,10 @@ class OutfitService {
         - Match the \(vibe) vibe
         - Only use items from the list
         - use common clothing combinations for fashion
-        
+        - Do not select multiple items of the same type (e.g., no two pants or two shirts) unless its reasonably fashionable such as accessories
+        - If the outfit can't be realistically generated or only one item fits, return an empty selectedItemIds array.
+
+
         Return JSON with:
         {"selectedItemIds": [item IDs array], "description": "outfit description"}
         """

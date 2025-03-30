@@ -131,6 +131,25 @@ class FirebaseService {
             }
         }
     }
+    func swapItem(item: ClothingItem, completion: @escaping (Result<ClothingItem, Error>) -> Void) {
+        // Fetch clean clothing items for the user
+        getCleanClothingItems(for: item.userId) { result in
+            switch result {
+            case .success(let items):
+                // Filter items to find a replacement of the same type
+                let sameTypeItems = items.filter { $0.type == item.type && $0.id != item.id }
+                
+                // Select a replacement item
+                if let newItem = sameTypeItems.randomElement() {
+                    completion(.success(newItem))
+                } else {
+                    completion(.failure(NSError(domain: "FirebaseService", code: 2, userInfo: [NSLocalizedDescriptionKey: "No replacement item of the same type found"])))
+                }
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
     
     // MARK: - Laundry Management
     
