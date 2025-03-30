@@ -6,7 +6,7 @@ class ClothingClassifier {
     private var generativeModel: GenerativeModel?
     
     init() {
-        // Define the response schema for clothing classification
+        //structured object
         let clothingSchema = Schema.object(
             properties: [
                 "type": Schema.enumeration(values: ClothingType.allCases.map { $0.rawValue }),
@@ -20,7 +20,7 @@ class ClothingClassifier {
             ]
         )
         
-        // Initialize the generative model with the schema
+
         generativeModel = vertexAI.generativeModel(
             modelName: "gemini-2.0-flash",
             generationConfig: GenerationConfig(
@@ -37,13 +37,12 @@ class ClothingClassifier {
                     throw NSError(domain: "ClothingClassifier", code: 2, userInfo: [NSLocalizedDescriptionKey: "Model not initialized"])
                 }
                 
-                // Create the prompt text
+
                 let promptText = "Classify this clothing item. Identify the type of clothing, its color, appropriate weather conditions, and style categories."
                 
-                // Generate content using the model with image and text
                 let response = try await model.generateContent(image, promptText)
                 
-                // Parse the JSON response
+                // parsing
                 if let jsonString = response.text,
                    let jsonData = jsonString.data(using: .utf8) {
                     let decoder = JSONDecoder()
@@ -64,7 +63,7 @@ class ClothingClassifier {
     }
 }
 
-// Model to decode the AI response
+// model to decode AI res
 struct ClothingClassificationResult: Codable {
     let type: String
     let color: String

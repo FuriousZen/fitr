@@ -19,7 +19,6 @@ struct LaundryView: View {
     var body: some View {
         NavigationView {
             ZStack {
-                // Background color similar to WardrobeView
                 AppColors.peachSnaps.opacity(0.2).ignoresSafeArea()
                 
                 VStack(spacing: 0) {
@@ -44,7 +43,6 @@ struct LaundryView: View {
                     editButton
                 }
                 
-                // Add grid layout toggle like in WardrobeView
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: toggleGridLayout) {
                         if case let .adaptive(min, _) = gridColumns.first?.size, min == 120 {
@@ -171,12 +169,9 @@ struct LaundryView: View {
     }
     
     private func toggleGridLayout() {
-        // Check if we're currently using the larger grid
         if case let .adaptive(min, max) = gridColumns.first?.size, min == 120 {
-            // Switch to compact grid
             gridColumns = [GridItem(.adaptive(minimum: 90, maximum: 110), spacing: 10)]
         } else {
-            // Switch to standard grid
             gridColumns = [GridItem(.adaptive(minimum: 120, maximum: 150), spacing: 12)]
         }
     }
@@ -223,17 +218,11 @@ struct LaundryView: View {
             DispatchQueue.main.async {
                 switch result {
                 case .success:
-                    // Update local state
                     if let index = self.laundryItems.firstIndex(where: { $0.id == item.id }) {
                         self.laundryItems.remove(at: index)
                     }
-                    
-                    // Show success toast
                     self.showToast(message: "\(item.name) washed and returned to wardrobe", isSuccess: true)
-                    
-                    // Refresh wardrobe
                     NotificationCenter.default.post(name: .wardrobeUpdated, object: nil)
-                    
                 case .failure(let error):
                     self.errorMessage = error.localizedDescription
                     self.showToast(message: "Failed to wash item", isSuccess: false)
@@ -250,14 +239,9 @@ struct LaundryView: View {
             DispatchQueue.main.async {
                 switch result {
                 case .success:
-                    // Update local state
                     self.laundryItems.removeAll { selectedItems.contains($0.id) }
                     self.selectedItems.removeAll()
-                    
-                    // Show success toast
                     self.showToast(message: "Items washed and returned to wardrobe", isSuccess: true)
-                    
-                    // Refresh wardrobe
                     NotificationCenter.default.post(name: .wardrobeUpdated, object: nil)
                     
                 case .failure(let error):

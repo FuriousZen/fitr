@@ -52,7 +52,6 @@ struct ClothingItemView: View {
                     .cornerRadius(8)
             }
             
-            // Item details
             Text(item.name)
                 .font(.caption)
                 .fontWeight(.medium)

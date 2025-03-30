@@ -14,8 +14,7 @@ struct Outfit: Identifiable, Codable {
     var weather: Weather
     var createdAt: Date
     var description: String
-    let vibe: String? // Add this property, make it optional for backward compatibility
-
+    let vibe: String?
     
     enum CodingKeys: String, CodingKey {
         case id

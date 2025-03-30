@@ -27,7 +27,6 @@ struct LaundryItemView: View {
                     .cornerRadius(8)
                     .clipped()
                 
-                // Selection indicator or action button
                 if isEditing {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                         .font(.system(size: 22))

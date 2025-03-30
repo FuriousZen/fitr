@@ -43,7 +43,6 @@ struct ClothingItem: Identifiable, Codable, Equatable {
 
     }
     
-    // Implementation of Equatable protocol
     static func == (lhs: ClothingItem, rhs: ClothingItem) -> Bool {
         return lhs.id == rhs.id
     }

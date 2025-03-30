@@ -23,15 +23,12 @@ struct DashboardView: View {
     @State private var selectedVibe: String?
     @State private var vibeSelectionAppeared = false
     
-    // Animation states
     @State private var vibeButtonsAppeared = false
     @State private var selectedVibeScale: CGFloat = 1.0
     
-    // Location retry tracking
     @State private var locationRetryCount = 0
     private let maxLocationRetries = 3
     
-    // Available vibes
     private let vibes = ["Casual", "Formal", "Athletic", "Cozy", "Night Out"]
     
     var body: some View {
@@ -61,24 +58,19 @@ struct DashboardView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WardrobeUpdated"))) { notification in
 
-                // Check the operation type
                 if let operation = notification.userInfo?["operation"] as? String {
                     switch operation {
                     case "markDirty":
-                        // If an item was marked dirty, update the outfit without reloading
                         if let itemId = notification.userInfo?["itemId"] as? String {
                             updateOutfitAfterMarkingItemDirty(itemId: itemId)
                         }
                         wardrobeLastUpdated = Date()
                         
                     default:
-                        // For other operations (add, delete, etc.), reload everything
                         wardrobeLastUpdated = Date()
-                        // Clear the cache when wardrobe changes
                         loadData()
                     }
                 } else {
-                    // If no operation specified, reload everything (backward compatibility)
                     wardrobeLastUpdated = Date()
                     loadData()
                 }
@@ -102,7 +94,6 @@ struct DashboardView: View {
             return
         }
         
-        // Load all clothing items first
         FirebaseService.shared.getClothingItems(for: userId) { result in
             DispatchQueue.main.async {
                 switch result {
@@ -111,20 +102,17 @@ struct DashboardView: View {
                     self.isWardrobeEmpty = items.isEmpty
                     
                     if !items.isEmpty {
-                                      // Only load weather if we don't have it already
-                                      if self.weather == nil {
-                                          self.loadWeatherData()
-                                      } else {
-                                          // If we have weather but no outfit and a selected vibe,
-                                          // regenerate the outfit
-                                          if self.outfit == nil && self.selectedVibe != nil {
-                                              self.getOutfitForVibe(vibe: self.selectedVibe!)
-                                          }
-                                          self.isLoading = false
-                                      }
-                                  } else {
-                                      self.isLoading = false
-                                  }
+                      if self.weather == nil {
+                          self.loadWeatherData()
+                      } else {
+                          if self.outfit == nil && self.selectedVibe != nil {
+                              self.getOutfitForVibe(vibe: self.selectedVibe!)
+                          }
+                          self.isLoading = false
+                      }
+                  } else {
+                      self.isLoading = false
+                  }
                     
                 case .failure(let error):
                     self.errorMessage = "Failed to load wardrobe: \(error.localizedDescription)"
@@ -136,16 +124,13 @@ struct DashboardView: View {
     
     private func loadWeatherData() {
         isLoading = true
-        
-        // Use Charlottesville as the fixed location cause can't use location on simulator
-        WeatherService.shared.getWeatherForCharlottesville { result in
+            WeatherService.shared.getWeatherForCharlottesville { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let weather):
                     self.weather = weather
                     self.isLoading = false
                 case .failure(let error):
-                    // If weather API fails, try with default weather
                     print("Weather error: \(error.localizedDescription)")
                     self.errorMessage = "Weather service unavailable. Using default recommendation."
                     self.useDefaultWeather()
@@ -155,7 +140,6 @@ struct DashboardView: View {
     }
 
     private func useDefaultWeather() {
-        // Create default weather (moderate temperature)
         let defaultWeather = Weather(
             temperature: 20.0,
             condition: .cloudy,
@@ -197,7 +181,6 @@ struct DashboardView: View {
             return
         }
         
-        // Clear previous outfit and show loading state
         outfit = nil
         
         OutfitService.shared.getOutfitRecommendation(
@@ -210,7 +193,6 @@ struct DashboardView: View {
                 switch result {
                 case .success(let outfit):
                     self.outfit = outfit
-                    // Cache the outfit
                 case .failure(let error):
                     self.errorMessage = "Outfit recommendation failed: \(error.localizedDescription)"
                 }
@@ -219,13 +201,11 @@ struct DashboardView: View {
     }
     
     private func updateOutfitAfterMarkingItemDirty(itemId: String) {
-        // Update the current outfit if it exists
         if var currentOutfit = outfit {
             currentOutfit.items.removeAll(where: { $0.id == itemId })
             outfit = currentOutfit
         }
         
-        // Remove the item from clothingItems as well
         clothingItems.removeAll(where: { $0.id == itemId })
     }
 }

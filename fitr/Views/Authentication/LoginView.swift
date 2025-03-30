@@ -28,7 +28,6 @@ struct LoginView: View {
 
         ZStack {
 
-            // Background gradient
 
             LinearGradient(
 
@@ -46,7 +45,6 @@ struct LoginView: View {
 
             VStack(spacing: 30) {
 
-                // Logo and app name
 
                 VStack(spacing: 10) {
 
@@ -82,7 +80,6 @@ struct LoginView: View {
 
                 
 
-                // Login/Signup form
 
                 VStack(spacing: 20) {
 

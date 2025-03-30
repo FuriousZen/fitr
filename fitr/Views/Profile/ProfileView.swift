@@ -16,7 +16,6 @@ struct ProfileView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 25) {
-                    // Profile header
                     VStack(spacing: 15) {
                         if let profileImageURL = authManager.currentUser?.profileImageURL,
                            let url = URL(string: profileImageURL) {
@@ -49,20 +48,16 @@ struct ProfileView: View {
                     .cornerRadius(15)
                     .padding(.horizontal)
                     
-                    // Settings sections
                     VStack(spacing: 5) {
                         SettingsSectionHeader(title: "Account")
                         
                         SettingsItem(icon: "person.fill", title: "Edit Profile") {
-                            // Navigate to edit profile
                         }
                         
                         SettingsItem(icon: "bell.fill", title: "Notifications") {
-                            // Navigate to notifications settings
                         }
                         
                         SettingsItem(icon: "lock.fill", title: "Privacy") {
-                            // Navigate to privacy settings
                         }
                     }
                     .padding(.horizontal)
@@ -71,15 +66,12 @@ struct ProfileView: View {
                         SettingsSectionHeader(title: "App")
                         
                         SettingsItem(icon: "gear", title: "Preferences") {
-                            // Navigate to app preferences
                         }
                         
                         SettingsItem(icon: "questionmark.circle.fill", title: "Help & Support") {
-                            // Navigate to help & support
                         }
                         
                         SettingsItem(icon: "info.circle.fill", title: "About") {
-                            // Navigate to about page
                         }
                     }
                     .padding(.horizontal)

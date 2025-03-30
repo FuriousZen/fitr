@@ -15,7 +15,6 @@ struct WardrobeView: View {
         GridItem(.adaptive(minimum: 120, maximum: 150), spacing: 12)
     ]
     
-    // Toast state
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var isSuccessToast = true
@@ -189,21 +188,16 @@ struct WardrobeView: View {
     }
     
     private func toggleGridLayout() {
-        // Check if we're currently using the larger grid
         if case let .adaptive(min, max) = gridColumns.first?.size, min == 120 {
-            // Switch to compact grid
             gridColumns = [GridItem(.adaptive(minimum: 90, maximum: 110), spacing: 10)]
         } else {
-            // Switch to standard grid
             gridColumns = [GridItem(.adaptive(minimum: 120, maximum: 150), spacing: 12)]
         }
     }
     
     private func handleWardrobeUpdate(_ notification: Notification) {
-        // Get the operation type from the notification
         let operationType = notification.userInfo?["operation"] as? String ?? "update"
         
-        // Set appropriate toast message based on operation
         switch operationType {
         case "add":
             self.toastMessage = "Item added to wardrobe!"
@@ -216,14 +210,12 @@ struct WardrobeView: View {
         self.isSuccessToast = true
         self.showToast = true
         
-        // Hide toast after 2 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation {
                 self.showToast = false
             }
         }
         
-        // Refresh the wardrobe items
         loadClothingItems()
     }
     
@@ -255,36 +247,30 @@ struct WardrobeView: View {
             DispatchQueue.main.async {
                 switch result {
                 case .success:
-                    // Update local array directly instead of reloading from Firebase
                     if let index = self.clothingItems.firstIndex(where: { $0.id == item.id }) {
                         self.clothingItems.remove(at: index)
                     }
                     
-                    // Show success toast
                     self.toastMessage = "Item deleted successfully"
                     self.isSuccessToast = true
                     self.showToast = true
                     
-                    // Hide toast after 2 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         withAnimation {
                             self.showToast = false
                         }
                     }
                     
-                    // Notify dashboard to update if needed
                     NotificationCenter.default.post(
                         name: Notification.Name("WardrobeUpdated"),
                         object: nil,
                         userInfo: ["operation": "delete"]
                     )
                 case .failure(let error):
-                    // Show error toast
                     self.toastMessage = "Failed to delete item"
                     self.isSuccessToast = false
                     self.showToast = true
                     
-                    // Hide toast after 3 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                         withAnimation {
                             self.showToast = false
@@ -302,36 +288,30 @@ struct WardrobeView: View {
             DispatchQueue.main.async {
                 switch result {
                 case .success:
-                    // Update local array directly instead of reloading from Firebase
                     if let index = self.clothingItems.firstIndex(where: { $0.id == item.id }) {
                         self.clothingItems.remove(at: index)
                     }
                     
-                    // Show success toast
                     self.toastMessage = "\(item.name) added to laundry basket"
                     self.isSuccessToast = true
                     self.showToast = true
                     
-                    // Hide toast after 2 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         withAnimation {
                             self.showToast = false
                         }
                     }
                     
-                    // Notify dashboard to update if needed
                     NotificationCenter.default.post(
                         name: Notification.Name("WardrobeUpdated"),
                         object: nil,
                         userInfo: ["operation": "update"]
                     )
                 case .failure(let error):
-                    // Show error toast
                     self.toastMessage = "Failed to move item to laundry"
                     self.isSuccessToast = false
                     self.showToast = true
                     
-                    // Hide toast after 3 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                         withAnimation {
                             self.showToast = false

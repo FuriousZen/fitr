@@ -36,23 +36,18 @@ struct HomeTabView: View {
                         .padding(.top, 100)
                 } else {
                     VStack(alignment: .leading, spacing: 20) {
-                        // Welcome section
                         welcomeSection
                         
                         if isWardrobeEmpty {
                             emptyWardrobeView
                         } else {
-                            // Weather section
                             weatherSection
                             
-                            // Vibe selection section
                             vibeSelectionSection
                             
-                            // Outfit recommendation
                             outfitRecommendationSection
                         }
                         
-                        // Quick actions
                         quickActionsSection
                         
                         if let errorMessage = errorMessage, !isWardrobeEmpty {
@@ -89,7 +84,6 @@ struct HomeTabView: View {
     
     private var emptyWardrobeView: some View {
         VStack(spacing: 25) {
-            // Illustration or icon
             Image(systemName: "tshirt.fill")
                 .font(.system(size: 60))
                 .foregroundColor(AppColors.springRain)
@@ -100,7 +94,6 @@ struct HomeTabView: View {
                         .frame(width: 120, height: 120)
                 )
             
-            // Welcome message
             VStack(spacing: 8) {
                 HStack(spacing: 2) {
                     Text("Welcome to ")
@@ -136,9 +129,8 @@ struct HomeTabView: View {
                     .multilineTextAlignment(.center)
             }
             
-            // Call to action
             Button(action: {
-                selectedTab = 1  // Switch to wardrobe tab
+                selectedTab = 1
             }) {
                 HStack {
                     Image(systemName: "plus.circle.fill")
@@ -206,7 +198,6 @@ struct HomeTabView: View {
                 .offset(y: vibeSelectionAppeared ? 0 : 10)
                 .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.2), value: vibeSelectionAppeared)
             
-            // Vibe cards in a horizontal scroll
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 16) {
                     ForEach(Array(vibes.enumerated()), id: \.element) { index, vibe in
@@ -224,7 +215,6 @@ struct HomeTabView: View {
                                 selectedVibeScale = 0.95
                             }
                             
-                            // Reset scale after brief animation
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                                 withAnimation(.spring()) {
                                     selectedVibeScale = 1.0
@@ -290,7 +280,6 @@ struct HomeTabView: View {
                         .padding(.horizontal)
                     
                     Button(action: {
-                        // Retry with the same vibe
                         if let vibe = selectedVibe {
                             getOutfitForVibe(vibe)
                         }

@@ -19,7 +19,6 @@ struct OutfitRecommendationView: View {
     @State private var markedItems = Set<String>()
     @State private var animatingItemId: String? = nil
     
-    // Weather and vibe parameters
     let weather: Weather
     let vibe: String
     
@@ -124,7 +123,6 @@ struct OutfitRecommendationView: View {
                             .foregroundColor(AppColors.davyGrey.opacity(0.6))
                             .padding()
                     } else {
-                        // Horizontal scrolling outfit preview
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 15) {
                                 ForEach(outfit.items) { item in
@@ -170,7 +168,6 @@ struct OutfitRecommendationView: View {
                 .background(AppColors.lightPink.opacity(0.15))
                 .cornerRadius(15)
                 
-                // Detailed item list with "Mark as Dirty" buttons
                 Text("Outfit Details")
                     .font(.headline)
                     .foregroundColor(AppColors.davyGrey)
@@ -209,9 +206,7 @@ struct OutfitRecommendationView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 
-                // Buttons moved to their own HStack
                 HStack(spacing: 8) {
-                    // Mark as Dirty Button
                     if !markedItems.contains(item.id) {
                         Button(action: { markAsDirty(item) }) {
                             VStack(spacing: 4) {
@@ -228,7 +223,6 @@ struct OutfitRecommendationView: View {
                         }
                     }
                     
-                    // Swap Button
                     Button(action: {
                         swap(item)
                     }) {
@@ -247,32 +241,31 @@ struct OutfitRecommendationView: View {
                 }
             }
             
-            // Tags moved below everything else
             HStack(spacing: 6) {
                 ForEach(item.weatherTags.prefix(2), id: \.self) { tag in
                     Text(tag.rawValue)
-                        .font(.system(size: 12)) // Slightly larger font
+                        .font(.system(size: 12))
                         .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false) // Prevent compression
-                        .padding(.horizontal, 8) // More horizontal padding
-                        .padding(.vertical, 4) // More vertical padding
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
                         .background(AppColors.moonMist.opacity(0.3))
                         .cornerRadius(4)
                 }
                 
                 ForEach(item.styleTags.prefix(1), id: \.self) { tag in
                     Text(tag.rawValue)
-                        .font(.system(size: 12)) // Slightly larger font
+                        .font(.system(size: 12))
                         .lineLimit(1)
-                        .fixedSize(horizontal: true, vertical: false) // Prevent compression
-                        .padding(.horizontal, 8) // More horizontal padding
-                        .padding(.vertical, 4) // More vertical padding
+                        .fixedSize(horizontal: true, vertical: false)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
                         .background(AppColors.springRain.opacity(0.3))
                         .cornerRadius(4)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12) // Match the card's padding
+            .padding(.horizontal, 12)
         }
         .padding()
         .background(Color.white)
@@ -291,11 +284,9 @@ struct OutfitRecommendationView: View {
             return
         }
         
-        // Fetch clothing items from Firebase
         FirebaseService.shared.getCleanClothingItems(for: userId) { result in
             switch result {
             case .success(let clothingItems):
-                // Generate outfit recommendation
                 OutfitService.shared.getOutfitRecommendation(
                     userId: userId,
                     vibe: vibe,
@@ -304,7 +295,6 @@ struct OutfitRecommendationView: View {
                 ) { outfitResult in
                     DispatchQueue.main.async {
                         isLoading = false
-                        
                         switch outfitResult {
                         case .success(let outfit):
                             self.outfit = outfit
@@ -324,37 +314,28 @@ struct OutfitRecommendationView: View {
     }
     
     private func markAsDirty(_ item: ClothingItem) {
-        // Start animation
         animatingItemId = item.id
         
-        // Call Firebase service
         FirebaseService.shared.markItemAsDirty(item: item) { result in
             DispatchQueue.main.async {
-                // Stop animation
                 animatingItemId = nil
                 
                 switch result {
                 case .success:
-                    // Add to marked items set
                     markedItems.insert(item.id)
-                    
-                    // Show success toast
                     toastMessage = "\(item.name) added to laundry basket"
                     isSuccessToast = true
                     showToast = true
                     
-                    // Hide toast after 2 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         showToast = false
                     }
                     
-                    // Update the outfit to remove the marked item
                     if var currentOutfit = self.outfit {
                         currentOutfit.items.removeAll(where: { $0.id == item.id })
                         self.outfit = currentOutfit
                     }
                     
-                    // Post notification with a specific operation type
                     NotificationCenter.default.post(
                         name: Notification.Name("WardrobeUpdated"),
                         object: nil,
@@ -362,12 +343,10 @@ struct OutfitRecommendationView: View {
                     )
                     
                 case .failure(let error):
-                    // Show error toast
                     toastMessage = "Failed to update: \(error.localizedDescription)"
                     isSuccessToast = false
                     showToast = true
                     
-                    // Hide toast after 3 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                         showToast = false
                     }
@@ -377,37 +356,29 @@ struct OutfitRecommendationView: View {
     }
     
     private func swap(_ item: ClothingItem) {
-        // Start animation
         animatingItemId = item.id
         
-        // Call Firebase service to swap the item
         FirebaseService.shared.swapItem(item: item) { result in
             DispatchQueue.main.async {
-                // Stop animation
                 animatingItemId = nil
                 switch result {
                 case .success(let newItem):
-                    // Replace the old item with the new item in the outfit
                     if var currentOutfit = self.outfit {
                         if let index = currentOutfit.items.firstIndex(where: { $0.id == item.id }) {
                             currentOutfit.items[index] = newItem
                             self.outfit = currentOutfit
                         }
                     }
-                    // Show success toast
                     toastMessage = "\(item.name) swapped successfully"
                     isSuccessToast = true
                     showToast = true
-                    // Hide toast after 2 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         showToast = false
                     }
                 case .failure(let error):
-                    // Show error toast
                     toastMessage = "Failed to swap item: \(error.localizedDescription)"
                     isSuccessToast = false
                     showToast = true
-                    // Hide toast after 3 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                         showToast = false
                     }

@@ -7,7 +7,6 @@
 
 import SwiftUI
 
-// Loading View
 struct LoadingView: View {
     var body: some View {
         VStack {
@@ -23,7 +22,6 @@ struct LoadingView: View {
     }
 }
 
-// Main Tab View
 struct MainTabView: View {
     @Binding var selectedTab: Int
     @Binding var isLoading: Bool
@@ -46,7 +44,6 @@ struct MainTabView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            // Home Tab
             HomeTabView(
                 isLoading: $isLoading,
                 weather: $weather,
@@ -68,7 +65,6 @@ struct MainTabView: View {
             }
             .tag(0)
             
-            // Wardrobe Tab
             WardrobeView()
                 .environmentObject(authManager)
                 .tabItem {
@@ -81,7 +77,6 @@ struct MainTabView: View {
                           }
                           .tag(2)
             
-            // Profile Tab
             ProfileView()
                 .environmentObject(authManager)
                 .tabItem {
@@ -93,7 +88,6 @@ struct MainTabView: View {
     }
 }
 
-// Quick Action Button
 struct QuickActionButton: View {
     let icon: String
     let title: String
@@ -128,7 +122,6 @@ struct QuickActionButton: View {
     }
 }
 
-// Scale Button Style
 struct ScaleButtonStyle: ButtonStyle {
     func makeBody(configuration: Self.Configuration) -> some View {
         configuration.label

@@ -20,7 +20,6 @@ struct VibeButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 12) {
-                // Icon with gradient background
                 ZStack {
                     Circle()
                         .fill(
@@ -38,7 +37,6 @@ struct VibeButton: View {
                         .foregroundColor(.white)
                 }
                 
-                // Vibe name
                 Text(vibe)
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(isSelected ? vibeColor(vibe) : AppColors.davyGrey)

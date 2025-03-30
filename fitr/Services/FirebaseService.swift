@@ -109,14 +109,12 @@ class FirebaseService {
     }
     
     func deleteClothingItem(item: ClothingItem, completion: @escaping (Result<Void, Error>) -> Void) {
-        // Delete from Firestore
         db.collection("users").document(item.userId).collection("clothingItems").document(item.id).delete { error in
             if let error = error {
                 completion(.failure(error))
                 return
             }
             
-            // Delete image from Storage if URL exists
             if !item.imageURL.isEmpty {
                 let storageRef = self.storage.storage.reference(forURL: item.imageURL)
                 storageRef.delete { error in
@@ -132,14 +130,11 @@ class FirebaseService {
         }
     }
     func swapItem(item: ClothingItem, completion: @escaping (Result<ClothingItem, Error>) -> Void) {
-        // Fetch clean clothing items for the user
         getCleanClothingItems(for: item.userId) { result in
             switch result {
             case .success(let items):
-                // Filter items to find a replacement of the same type
                 let sameTypeItems = items.filter { $0.type == item.type && $0.id != item.id }
                 
-                // Select a replacement item
                 if let newItem = sameTypeItems.randomElement() {
                     completion(.success(newItem))
                 } else {
@@ -155,11 +150,9 @@ class FirebaseService {
     
     func markItemAsDirty(item: ClothingItem, completion: @escaping (Result<Void, Error>) -> Void) {
         do {
-            // Create a copy with updated dirty status
             var dirtyItem = item
             dirtyItem.dirty = true
             
-            // Update the item in the clothingItems collection
             let itemRef = db.collection("users").document(item.userId)
                 .collection("clothingItems").document(item.id)
             
@@ -178,7 +171,6 @@ class FirebaseService {
             for var item in items {
                 item.dirty = false
                 
-                // Update the item in the clothingItems collection
                 let itemRef = db.collection("users").document(item.userId)
                     .collection("clothingItems").document(item.id)
                 

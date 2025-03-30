@@ -9,7 +9,6 @@ class WeatherService {
     private var cacheTimestamp: Date?
     private let cacheValidityDuration: TimeInterval = 3600 // 1 hour
     
-    // Method to get weather for Charlottesville, VA
     func getWeatherForCharlottesville(completion: @escaping (Result<Weather, Error>) -> Void) {
         // Check if we have valid cached weather data
         if let cachedWeather = cachedWeather,
@@ -19,7 +18,6 @@ class WeatherService {
             return
         }
         
-        // Otherwise fetch from API using city name
         var components = URLComponents(string: baseURL)
         components?.queryItems = [
             URLQueryItem(name: "q", value: "Charlottesville,VA,US"),
@@ -46,7 +44,6 @@ class WeatherService {
             do {
                 let weatherResponse = try JSONDecoder().decode(OpenWeatherResponse.self, from: data)
                 
-                // Convert to our Weather model
                 let weather = Weather(
                     temperature: weatherResponse.main.temp,
                     condition: self.mapWeatherCondition(weatherResponse.weather.first?.main ?? ""),
@@ -56,7 +53,7 @@ class WeatherService {
                     date: Date()
                 )
                 print(weather)
-                // Cache the result
+                // cache the result
                 self.cachedWeather = weather
                 self.cacheTimestamp = Date()
                 
@@ -86,13 +83,13 @@ class WeatherService {
             if condition.lowercased().contains("wind") {
                 return .windy
             } else {
-                return .cloudy // Default fallback
+                return .cloudy
             }
         }
     }
 }
 
-// Models for OpenWeatherMap API response
+// models for OpenWeatherMap API response
 struct OpenWeatherResponse: Codable {
     let weather: [WeatherInfo]
     let main: MainInfo

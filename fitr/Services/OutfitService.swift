@@ -17,7 +17,6 @@ class OutfitService {
     }
     
     private func setupVertexAIModel() {
-        // Define a response schema that returns just the item IDs and description
         let outfitSchema = Schema.object(
             properties: [
                 "selectedItemIds": Schema.array(
@@ -27,7 +26,6 @@ class OutfitService {
             ]
         )
         
-        // Initialize the generative model with the schema
         generativeModel = vertexAI.generativeModel(
             modelName: "gemini-1.5-pro",
             generationConfig: GenerationConfig(
@@ -39,7 +37,6 @@ class OutfitService {
     }
     
     func getOutfitRecommendation(userId: String, vibe: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
-        // Filter out dirty items
         let cleanItems = clothingItems.filter { !$0.dirty }
         
         if cleanItems.isEmpty {
@@ -51,7 +48,6 @@ class OutfitService {
             return
         }
         
-        // Generate outfit with AI
         generateOutfitWithAI(userId: userId, vibe: vibe, weather: weather, clothingItems: cleanItems) { result in
             completion(result)
         }
@@ -62,7 +58,6 @@ class OutfitService {
             return
         }
         
-        // Create a structured prompt for the AI
         let content = createStructuredPrompt(vibe: vibe, weather: weather, clothingItems: clothingItems)
         
         Task {
@@ -72,7 +67,6 @@ class OutfitService {
                 if let jsonString = response.text,
                    let jsonData = jsonString.data(using: .utf8) {
                     
-                    // Parse the AI response
                     let decoder = JSONDecoder()
                     let aiResponse = try decoder.decode(OutfitAIResponse.self, from: jsonData)
                     print("AI RES", aiResponse)
@@ -81,16 +75,16 @@ class OutfitService {
                     }
                     var selectedItemIds = Set(aiResponse.selectedItemIds)
                     
-                    // Ensure only one item per category is included
                     var selectedTypes: [ClothingType: ClothingItem] = [:]
                     for item in clothingItems where selectedItemIds.contains(item.id) {
                         if selectedTypes[item.type] == nil {
                             selectedTypes[item.type] = item
                         }
                     }
+                    //one top n bottom
                     let mutuallyExclusiveTypes: [[ClothingType]] = [
-                        [.tShirt, .shirt], // One top
-                        [.pants, .shorts]  // One bottom
+                        [.tShirt, .shirt],
+                        [.pants, .shorts]
                     ]
                     for category in mutuallyExclusiveTypes {
                         for item in clothingItems where category.contains(item.type) {
@@ -101,14 +95,12 @@ class OutfitService {
                         }
                     }
 
-                    // Add selected items to the set
                     selectedItemIds = Set(selectedTypes.values.map { $0.id })
                     for (_, item) in selectedTypes {
                         selectedItemIds.insert(item.id)
                     }
                     let selectedItems = clothingItems.filter { selectedItemIds.contains($0.id) }
                                         
-                    // Create the outfit
                     let outfit = Outfit(
                         id: UUID().uuidString,
                         userId: userId,
@@ -134,7 +126,6 @@ class OutfitService {
     }
     
     private func createStructuredPrompt(vibe: String, weather: Weather, clothingItems: [ClothingItem]) -> String {
-        // Create a minimal representation of the clothing items
         let itemsJson = clothingItems.map { item -> [String: Any] in
             return [
                 "id": item.id,
@@ -146,7 +137,7 @@ class OutfitService {
             ]
         }
         
-        // Convert to JSON string - use compact printing to save tokens
+        // convert to JSON string - use compact printing to save tokens
         let itemsJsonData = try? JSONSerialization.data(withJSONObject: itemsJson, options: [])
         let itemsJsonString = itemsJsonData.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         
@@ -162,7 +153,6 @@ class OutfitService {
         let weatherJsonData = try? JSONSerialization.data(withJSONObject: weatherJson, options: [.prettyPrinted])
         let weatherJsonString = weatherJsonData.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
         
-        // Create a concise prompt
         return """
         As a stylist, create an outfit for \(vibe) vibe in \(weatherJsonString) weather.
         
@@ -186,7 +176,6 @@ class OutfitService {
     }
 }
 
-// Simple struct to decode the AI response
 struct OutfitAIResponse: Codable {
     let selectedItemIds: [String]
     let description: String

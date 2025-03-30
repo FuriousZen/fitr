@@ -26,7 +26,7 @@ class AuthenticationManager: ObservableObject {
     
     func checkAuthenticationState() {
         if let user = Auth.auth().currentUser {
-            // User is authenticated with Firebase, but we need to fetch their data
+
             isLoading = true
             
             fetchUserData(userId: user.uid) { success in
@@ -34,7 +34,6 @@ class AuthenticationManager: ObservableObject {
                     self.isLoading = false
                     self.isAuthenticated = success
                     
-                    // If we couldn't load the user data, sign out to avoid inconsistent state
                     if !success {
                         try? Auth.auth().signOut()
                         self.isAuthenticated = false
@@ -48,7 +47,6 @@ class AuthenticationManager: ObservableObject {
         }
     }
 
-    // Email/Password login with Firebase
     func loginWithEmailPassword(email: String, password: String) {
         isLoading = true
         error = nil
@@ -57,22 +55,18 @@ class AuthenticationManager: ObservableObject {
             self.isLoading = false
             
             if let error = error as NSError? {
-                // Check for specific Firebase auth error codes
                 if error.domain == AuthErrorDomain {
-                    // Handle specific Firebase auth errors
                     switch error.code {
                     case AuthErrorCode.invalidCredential.rawValue,
                          AuthErrorCode.wrongPassword.rawValue,
                          AuthErrorCode.userNotFound.rawValue,
                          AuthErrorCode.invalidEmail.rawValue:
-                        // Create a user-friendly error message
                         self.error = NSError(
                             domain: "app.fitr",
                             code: error.code,
                             userInfo: [NSLocalizedDescriptionKey: "Invalid email or password"]
                         )
                     default:
-                        // For other Firebase errors, use the original error
                         self.error = error
                     }
                 }
@@ -80,10 +74,8 @@ class AuthenticationManager: ObservableObject {
             }
             
             if let authResult = authResult {
-                // Only set isAuthenticated after user data is loaded
                 self.fetchUserData(userId: authResult.user.uid) { success in
                     DispatchQueue.main.async {
-                        // Only set isAuthenticated if we successfully loaded the user data
                         self.isAuthenticated = success
                     }
                 }

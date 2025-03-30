@@ -29,12 +29,10 @@ struct AddClothingView: View {
     @State private var isUploading = false
     @State private var uploadTask: StorageUploadTask?
     
-    // Toast state
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var isSuccessToast = true
     
-    // Vertex AI classifier
     private let clothingClassifier = ClothingClassifier()
     
     // MARK: - Body
@@ -51,7 +49,6 @@ struct AddClothingView: View {
                     .padding()
                 }
                 
-                // Loading overlay
                 if isLoading {
                     Color.black.opacity(0.4)
                         .ignoresSafeArea()
@@ -84,7 +81,6 @@ struct AddClothingView: View {
                 )
             }
             .onDisappear {
-                // Cancel any ongoing upload when view disappears
                 uploadTask?.cancel()
             }
             .toast(isPresented: $showToast, message: toastMessage, isSuccess: isSuccessToast)
@@ -226,34 +222,28 @@ struct AddClothingView: View {
         }
     }
     private func applyAllAISuggestions() {
-        // Apply type suggestion
         if let suggestedType = aiSuggestedType {
             clothingType = suggestedType
         }
         
-        // Apply color suggestion
         if let suggestedColor = aiSuggestedColor {
             clothingColor = suggestedColor
         }
         if let suggestedColor = aiSuggestedColor, let suggestedType = aiSuggestedType {
             clothingName = "\(suggestedColor) \(suggestedType)"
            }
-        // Apply weather tags suggestions
         if let suggestedWeatherTags = aiSuggestedWeatherTags, !suggestedWeatherTags.isEmpty {
             selectedWeatherTags = Set(suggestedWeatherTags)
         }
         
-        // Apply style tags suggestions
         if let suggestedStyleTags = aiSuggestedStyleTags, !suggestedStyleTags.isEmpty {
             selectedStyleTags = Set(suggestedStyleTags)
         }
         
-        // Show success toast
         toastMessage = "All suggestions applied!"
         isSuccessToast = true
         showToast = true
         
-        // Hide toast after 2 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation {
                 self.showToast = false
@@ -423,7 +413,6 @@ struct AddClothingView: View {
                 
                 switch result {
                 case .success(let classification):
-                    // Process the classification result
                     if let type = ClothingType.allCases.first(where: { $0.rawValue.lowercased() == classification.type.lowercased() }) {
                         self.aiSuggestedType = type
                     }
@@ -438,7 +427,6 @@ struct AddClothingView: View {
                         self.aiSuggestedStyleTags = suggestedStyles
                     }
                     
-                    // Update weather tags suggestion
                     let suggestedWeatherTags = classification.weatherTags.compactMap { weatherString in
                         return WeatherTag.allCases.first { $0.rawValue.lowercased() == weatherString.lowercased() }
                     }
@@ -451,12 +439,10 @@ struct AddClothingView: View {
                        self.aiSuggestedStyleTags != nil || self.aiSuggestedWeatherTags != nil {
                         self.showAIClassificationResults = true
                         
-                        // Show success toast for AI analysis
                         self.toastMessage = "AI analysis complete!"
                         self.isSuccessToast = true
                         self.showToast = true
                         
-                        // Hide toast after 2 seconds
                         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                             withAnimation {
                                 self.showToast = false
@@ -465,12 +451,10 @@ struct AddClothingView: View {
                     } else {
                         self.errorMessage = "AI couldn't identify the clothing properly"
                         
-                        // Show error toast
                         self.toastMessage = "AI analysis failed"
                         self.isSuccessToast = false
                         self.showToast = true
                         
-                        // Hide toast after 3 seconds
                         DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                             withAnimation {
                                 self.showToast = false
@@ -481,12 +465,10 @@ struct AddClothingView: View {
                 case .failure(let error):
                     self.errorMessage = "Classification failed: \(error.localizedDescription)"
                     
-                    // Show error toast
                     self.toastMessage = "AI analysis failed"
                     self.isSuccessToast = false
                     self.showToast = true
                     
-                    // Hide toast after 3 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                         withAnimation {
                             self.showToast = false
@@ -517,7 +499,6 @@ struct AddClothingView: View {
         isUploading = true
         errorMessage = nil
         
-        // Set a timeout for the upload
         DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
             if self.isUploading {
                 self.isUploading = false
@@ -525,12 +506,10 @@ struct AddClothingView: View {
                 self.errorMessage = "Upload timed out"
                 self.uploadTask?.cancel()
                 
-                // Show timeout toast
                 self.toastMessage = "Upload timed out"
                 self.isSuccessToast = false
                 self.showToast = true
                 
-                // Hide toast after 3 seconds
                 DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
                     withAnimation {
                         self.showToast = false
@@ -539,7 +518,6 @@ struct AddClothingView: View {
             }
         }
         
-        // Upload image to Firebase Storage
         FirebaseService.shared.uploadClothingImage(image: image, userId: userId) { [self] result in
             DispatchQueue.main.async {
                 switch result {
@@ -572,17 +550,14 @@ struct AddClothingView: View {
                 
                 switch result {
                 case .success:
-                    // Show success toast
                     self.toastMessage = "Item saved successfully!"
                     self.isSuccessToast = true
                     self.showToast = true
                     
-                    // Hide toast after 2 seconds and dismiss
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         withAnimation {
                             self.showToast = false
                         }
-                        // Close the sheet
                         self.presentationMode.wrappedValue.dismiss()
                         
                         NotificationCenter.default.post(
@@ -595,12 +570,10 @@ struct AddClothingView: View {
                 case .failure(let error):
                     self.errorMessage = "Failed to save clothing item: \(error.localizedDescription)"
                     
-                    // Show error toast
                     self.toastMessage = "Failed to save item"
                     self.isSuccessToast = false
                     self.showToast = true
                     
-                    // Hide toast after 3 seconds
                     DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
                         withAnimation {
                             self.showToast = false
@@ -621,7 +594,6 @@ struct AddClothingView: View {
         self.isSuccessToast = false
         self.showToast = true
         
-        // Hide toast after 3 seconds
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation {
                 self.showToast = false
