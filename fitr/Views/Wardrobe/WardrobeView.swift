@@ -1,5 +1,6 @@
 import SwiftUI
 import Firebase
+import FirebaseAuth
 
 struct WardrobeView: View {
     @EnvironmentObject var authManager: AuthenticationManager
@@ -38,8 +39,8 @@ struct WardrobeView: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WardrobeUpdated"))) { notification in
-                  handleWardrobeUpdate(notification)
-              }
+                handleWardrobeUpdate(notification)
+            }
             .toast(isPresented: $showToast, message: toastMessage, isSuccess: isSuccessToast)
         }
     }
@@ -134,6 +135,8 @@ struct WardrobeView: View {
                 ForEach(filteredClothingItems) { item in
                     ClothingItemView(item: item, onDelete: {
                         deleteClothingItem(item)
+                    }, onMarkDirty: {
+                        markItemAsDirty(item)
                     })
                     .frame(height: 180)
                 }
@@ -166,11 +169,12 @@ struct WardrobeView: View {
         ToolbarItem(placement: .navigationBarTrailing) {
             Button(action: toggleGridLayout) {
                 // Check the current grid size to determine which icon to show
-                   if case let .adaptive(min, _) = gridColumns.first?.size, min == 120 {
-                       Image(systemName: "square.grid.3x3")
-                   } else {
-                       Image(systemName: "square.grid.2x2")
-                   }            }
+                if case let .adaptive(min, _) = gridColumns.first?.size, min == 120 {
+                    Image(systemName: "square.grid.3x3")
+                } else {
+                    Image(systemName: "square.grid.2x2")
+                }
+            }
         }
     }
     
@@ -247,9 +251,7 @@ struct WardrobeView: View {
     }
     
     private func deleteClothingItem(_ item: ClothingItem) {
-        guard let userId = authManager.currentUser?.id else { return }
-        
-        FirebaseService.shared.deleteClothingItem(itemId: item.id, userId: userId, imageURL: item.imageURL) { result in
+        FirebaseService.shared.deleteClothingItem(item: item) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success:
@@ -260,7 +262,7 @@ struct WardrobeView: View {
                     
                     // Show success toast
                     self.toastMessage = "Item deleted successfully"
-                    self.isSuccessToast = false
+                    self.isSuccessToast = true
                     self.showToast = true
                     
                     // Hide toast after 2 seconds
@@ -272,10 +274,10 @@ struct WardrobeView: View {
                     
                     // Notify dashboard to update if needed
                     NotificationCenter.default.post(
-                                       name: Notification.Name("WardrobeUpdated"),
-                                       object: nil,
-                                       userInfo: ["operation": "delete"]
-                                   )
+                        name: Notification.Name("WardrobeUpdated"),
+                        object: nil,
+                        userInfo: ["operation": "delete"]
+                    )
                 case .failure(let error):
                     // Show error toast
                     self.toastMessage = "Failed to delete item"
@@ -290,6 +292,53 @@ struct WardrobeView: View {
                     }
                     
                     self.errorMessage = "Failed to delete item: \(error.localizedDescription)"
+                }
+            }
+        }
+    }
+    
+    private func markItemAsDirty(_ item: ClothingItem) {
+        FirebaseService.shared.markItemAsDirty(item: item) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    // Update local array directly instead of reloading from Firebase
+                    if let index = self.clothingItems.firstIndex(where: { $0.id == item.id }) {
+                        self.clothingItems.remove(at: index)
+                    }
+                    
+                    // Show success toast
+                    self.toastMessage = "\(item.name) added to laundry basket"
+                    self.isSuccessToast = true
+                    self.showToast = true
+                    
+                    // Hide toast after 2 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                        withAnimation {
+                            self.showToast = false
+                        }
+                    }
+                    
+                    // Notify dashboard to update if needed
+                    NotificationCenter.default.post(
+                        name: Notification.Name("WardrobeUpdated"),
+                        object: nil,
+                        userInfo: ["operation": "update"]
+                    )
+                case .failure(let error):
+                    // Show error toast
+                    self.toastMessage = "Failed to move item to laundry"
+                    self.isSuccessToast = false
+                    self.showToast = true
+                    
+                    // Hide toast after 3 seconds
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+                        withAnimation {
+                            self.showToast = false
+                        }
+                    }
+                    
+                    self.errorMessage = "Failed to move item to laundry: \(error.localizedDescription)"
                 }
             }
         }
@@ -314,4 +363,3 @@ struct FilterButton: View {
         }
     }
 }
-

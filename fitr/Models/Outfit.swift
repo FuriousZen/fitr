@@ -28,16 +28,4 @@ struct Outfit: Identifiable, Codable {
     }
 }
 
-enum StyleTag: String, Codable, CaseIterable {
-    case casual
-    case formal
-    case business
-    case elegant
-    case athletic
-    case sporty
-    case comfortable
-    case trendy
-    case stylish
-    case everyday
-    case warm
-}
+

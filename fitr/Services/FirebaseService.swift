@@ -50,7 +50,7 @@ class FirebaseService {
     
     func saveClothingItem(item: ClothingItem, completion: @escaping (Result<ClothingItem, Error>) -> Void) {
         do {
-            let docRef = db.collection(FirebaseCollections.clothingItems).document(item.id)
+            let docRef = db.collection("users").document(item.userId).collection("clothingItems").document(item.id)
             try docRef.setData(from: item)
             completion(.success(item))
         } catch {
@@ -59,8 +59,7 @@ class FirebaseService {
     }
     
     func getClothingItems(for userId: String, completion: @escaping (Result<[ClothingItem], Error>) -> Void) {
-        db.collection(FirebaseCollections.clothingItems)
-            .whereField("user_id", isEqualTo: userId)
+        db.collection("users").document(userId).collection("clothingItems")
             .order(by: "created_at", descending: true)
             .getDocuments { snapshot, error in
                 if let error = error {
@@ -68,32 +67,24 @@ class FirebaseService {
                     return
                 }
                 
-                guard let documents = snapshot?.documents else {
-                    completion(.success([]))
-                    return
-                }
-                
-                do {
-                    let items = try documents.compactMap { try $0.data(as: ClothingItem.self) }
-                    completion(.success(items))
-                } catch {
-                    completion(.failure(error))
-                }
+                let items = snapshot?.documents.compactMap { doc in
+                    try? doc.data(as: ClothingItem.self)
+                } ?? []
+                completion(.success(items))
             }
     }
     
-    func deleteClothingItem(itemId: String, userId: String, imageURL: String, completion: @escaping (Result<Void, Error>) -> Void) {
+    func deleteClothingItem(item: ClothingItem, completion: @escaping (Result<Void, Error>) -> Void) {
         // Delete from Firestore
-        db.collection(FirebaseCollections.clothingItems).document(itemId).delete { error in
+        db.collection("users").document(item.userId).collection("clothingItems").document(item.id).delete { error in
             if let error = error {
                 completion(.failure(error))
                 return
             }
             
-            // Extract image path from URL and delete from Storage
-            if let url = URL(string: imageURL), let imagePath = url.path.components(separatedBy: "clothing_images/").last {
-                let storageRef = self.storage.child("clothing_images/\(imagePath)")
-                
+            // Delete image from Storage if URL exists
+            if !item.imageURL.isEmpty {
+                let storageRef = self.storage.storage.reference(forURL: item.imageURL)
                 storageRef.delete { error in
                     if let error = error {
                         completion(.failure(error))
@@ -104,6 +95,86 @@ class FirebaseService {
             } else {
                 completion(.success(()))
             }
+        }
+    }
+    
+    // MARK: - Laundry Items
+    
+    func getLaundryItems(for userId: String, completion: @escaping (Result<[ClothingItem], Error>) -> Void) {
+        db.collection("users").document(userId).collection("laundryItems")
+            .order(by: "created_at", descending: true)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                
+                let items = snapshot?.documents.compactMap { doc in
+                    try? doc.data(as: ClothingItem.self)
+                } ?? []
+                completion(.success(items))
+            }
+    }
+    
+    // In FirebaseService.swift
+
+    func markItemAsDirty(item: ClothingItem, completion: @escaping (Result<Void, Error>) -> Void) {
+        do {
+            // Create a copy with updated dirty status
+            var dirtyItem = item
+            dirtyItem.dirty = true
+            
+            let batch = db.batch()
+            
+            // Remove from clothingItems
+            let wardrobeRef = db.collection("users").document(item.userId)
+                              .collection("clothingItems").document(item.id)
+            batch.deleteDocument(wardrobeRef)
+            
+            // Add to laundryItems
+            let laundryRef = db.collection("users").document(item.userId)
+                              .collection("laundryItems").document(item.id)
+            try batch.setData(from: dirtyItem, forDocument: laundryRef)
+            
+            batch.commit { error in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        } catch {
+            completion(.failure(error))
+        }
+    }
+
+    func washItems(items: [ClothingItem], completion: @escaping (Result<Void, Error>) -> Void) {
+        do {
+            let batch = db.batch()
+            
+            for var item in items {
+                item.dirty = false
+                
+                // Remove from laundryItems
+                let laundryRef = db.collection("users").document(item.userId)
+                                  .collection("laundryItems").document(item.id)
+                batch.deleteDocument(laundryRef)
+                
+                // Add back to clothingItems
+                let wardrobeRef = db.collection("users").document(item.userId)
+                                   .collection("clothingItems").document(item.id)
+                try batch.setData(from: item, forDocument: wardrobeRef)
+            }
+            
+            batch.commit { error in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        } catch {
+            completion(.failure(error))
         }
     }
     

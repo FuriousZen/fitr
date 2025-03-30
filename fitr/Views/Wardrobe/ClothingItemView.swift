@@ -4,10 +4,10 @@ import Kingfisher
 struct ClothingItemView: View {
     let item: ClothingItem
     var onDelete: () -> Void
+    var onMarkDirty: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            // Image
             if let url = URL(string: item.imageURL) {
                 AsyncImage(url: url) { phase in
                     switch phase {
@@ -70,7 +70,11 @@ struct ClothingItemView: View {
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
         .contextMenu {
             Button(role: .destructive, action: onDelete) {
+                
                 Label("Delete", systemImage: "trash")
+            }
+            Button(role: .destructive, action: onMarkDirty) {
+                Label("Mark as dirty", systemImage: "exclamationmark.triangle")
             }
         }
     }

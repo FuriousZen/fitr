@@ -75,6 +75,11 @@ struct MainTabView: View {
                     Label("Wardrobe", systemImage: "tshirt.fill")
                 }
                 .tag(1)
+            LaundryView()
+                          .tabItem {
+                              Label("Laundry", systemImage: "basket.fill")
+                          }
+                          .tag(2)
             
             // Profile Tab
             ProfileView()
@@ -82,7 +87,7 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Profile", systemImage: "person.fill")
                 }
-                .tag(2)
+                .tag(3)
         }
         .accentColor(AppColors.davyGrey)
     }
