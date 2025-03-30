@@ -5,246 +5,154 @@
 //
 
 import Foundation
+import FirebaseVertexAI
 
 class OutfitService {
     static let shared = OutfitService()
+    private let vertexAI = VertexAI.vertexAI()
+    private var generativeModel: GenerativeModel?
     
-    // Updated to always require a vibe
-    func getOutfitRecommendation(userId: String, vibe: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
-        // Always try to get recommendation from backend first
-        getRecommendationFromBackend(userId: userId, vibe: vibe, weather: weather, clothingItems: clothingItems) { result in
-            switch result {
-            case .success(let outfit):
-                completion(.success(outfit))
-            case .failure(let error):
-                // If backend fails, fallback to local recommendation
-                print("Backend recommendation failed: \(error.localizedDescription). Falling back to local recommendation.")
-                self.getLocalRecommendation(userId: userId, vibe: vibe, weather: weather, clothingItems: clothingItems, completion: completion)
-            }
-        }
+    init() {
+        setupVertexAIModel()
     }
     
-    private func getRecommendationFromBackend(userId: String, vibe: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
-        guard let url = URL(string: "\(APIEndpoints.baseURL)\(APIEndpoints.outfitRecommendationEndpoint)") else {
-            completion(.failure(NSError(domain: "OutfitService", code: 0, userInfo: [NSLocalizedDescriptionKey: "Invalid URL"])))
-            return
-        }
-        
-        // Prepare request body with vibe
-        let requestBody = OutfitRequestBody(userId: userId, vibe: vibe, weather: weather, clothingItems: clothingItems)
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        do {
-            request.httpBody = try JSONEncoder().encode(requestBody)
-        } catch {
-            completion(.failure(error))
-            return
-        }
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            
-            guard let data = data else {
-                completion(.failure(NSError(domain: "OutfitService", code: 1, userInfo: [NSLocalizedDescriptionKey: "No data received"])))
-                return
-            }
-            
-            do {
-                // Parse the response from the AI backend
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
-                
-                let outfit = try decoder.decode(Outfit.self, from: data)
-                completion(.success(outfit))
-            } catch {
-                completion(.failure(error))
-            }
-        }.resume()
-    }
-    
-    private func getLocalRecommendation(userId: String, vibe: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
-        // Simple local recommendation logic based on weather and vibe
-        guard !clothingItems.isEmpty else {
-            completion(.failure(NSError(domain: "OutfitService", code: 2, userInfo: [NSLocalizedDescriptionKey: "No clothing items available"])))
-            return
-        }
-        
-        // Determine appropriate weather tags based on current weather
-        var appropriateWeatherTags: [WeatherTag] = []
-        
-        // Temperature-based tags
-        if weather.temperature > 77 {
-            appropriateWeatherTags.append(.hot)
-        } else if weather.temperature > 64 {
-            appropriateWeatherTags.append(.warm)
-        } else if weather.temperature > 50 {
-            appropriateWeatherTags.append(.cool)
-        } else {
-            appropriateWeatherTags.append(.cold)
-        }
-        
-        // Condition-based tags
-        switch weather.condition {
-        case .rainy:
-            appropriateWeatherTags.append(.rainy)
-        case .snowy:
-            appropriateWeatherTags.append(.snowy)
-        case .windy:
-            appropriateWeatherTags.append(.windy)
-        default:
-            break
-        }
-        
-        // Filter clothing items that match the appropriate weather tags
-        var filteredItems = clothingItems.filter { item in
-            return item.weatherTags.contains { appropriateWeatherTags.contains($0) }
-        }
-        
-        // If no matching items, use all items
-        if filteredItems.isEmpty {
-            filteredItems = clothingItems
-        }
-        
-        // Further filter by style tags based on vibe
-        var styleTagsForVibe: [StyleTag] = []
-        
-        switch vibe.lowercased() {
-        case "casual":
-            styleTagsForVibe = [.casual, .comfortable, .everyday]
-        case "formal":
-            styleTagsForVibe = [.formal, .business, .elegant]
-        case "athletic":
-            styleTagsForVibe = [.athletic, .sporty, .comfortable]
-        case "cozy":
-            styleTagsForVibe = [.comfortable, .casual, .warm]
-        case "night out":
-            styleTagsForVibe = [.elegant, .trendy, .stylish]
-        default:
-            // Default to casual
-            styleTagsForVibe = [.casual, .comfortable]
-        }
-        
-        // Try to filter by style tags
-        let styleFilteredItems = filteredItems.filter { item in
-            return item.styleTags.contains { styleTagsForVibe.contains($0) }
-        }
-        
-        // Use style filtered items if available, otherwise use weather filtered items
-        let itemsToUse = styleFilteredItems.isEmpty ? filteredItems : styleFilteredItems
-        
-        // Select one item of each necessary type
-        var selectedItems: [ClothingItem] = []
-        
-        // For cold weather, we need more layers
-        if appropriateWeatherTags.contains(.cold) {
-            // Try to find a top layer (coat or jacket)
-            if let topLayer = itemsToUse.first(where: { $0.type == .coat || $0.type == .jacket }) {
-                selectedItems.append(topLayer)
-            }
-            
-            // Try to find a mid layer (sweater)
-            if let midLayer = itemsToUse.first(where: { $0.type == .sweater }) {
-                selectedItems.append(midLayer)
-            }
-        }
-        
-        // Always need a base layer (shirt or t-shirt)
-        if let baseLayer = itemsToUse.first(where: { $0.type == .shirt || $0.type == .tShirt }) {
-            selectedItems.append(baseLayer)
-        }
-        
-        // Always need bottoms (pants, jeans, shorts, or skirt)
-        if let bottoms = itemsToUse.first(where: { $0.type == .pants || $0.type == .jeans || $0.type == .shorts || $0.type == .skirt }) {
-            selectedItems.append(bottoms)
-        }
-        
-        // Always need shoes
-        if let shoes = itemsToUse.first(where: { $0.type == .shoes }) {
-            selectedItems.append(shoes)
-        }
-        
-        // If we have a dress, it can replace top and bottoms
-        if selectedItems.isEmpty || (!selectedItems.contains(where: { $0.type == .shirt || $0.type == .tShirt }) &&
-                                    !selectedItems.contains(where: { $0.type == .pants || $0.type == .jeans || $0.type == .shorts || $0.type == .skirt })) {
-            if let dress = itemsToUse.first(where: { $0.type == .dress }) {
-                selectedItems.append(dress)
-            }
-        }
-        
-        // If we still don't have enough items, add some random ones
-        if selectedItems.count < 2 {
-            let remainingItems = itemsToUse.filter { !selectedItems.contains($0) }
-            selectedItems.append(contentsOf: Array(remainingItems.prefix(2 - selectedItems.count)))
-        }
-        
-        // Add accessories based on vibe
-        if vibe.lowercased() == "formal" || vibe.lowercased() == "night out" {
-            if let accessory = itemsToUse.first(where: { $0.type == .accessory }) {
-                selectedItems.append(accessory)
-            }
-        }
-        
-        // Create description based on selected items and vibe
-        let description = createOutfitDescriptionWithVibe(items: selectedItems, vibe: vibe, weather: weather)
-        
-        // Create outfit
-        let outfit = Outfit(
-            id: UUID().uuidString,
-            userId: userId,
-            items: selectedItems,
-            weather: weather,
-            createdAt: Date(),
-            description: description,
-            vibe: vibe
+    private func setupVertexAIModel() {
+        // Define a response schema that returns just the item IDs and description
+        let outfitSchema = Schema.object(
+            properties: [
+                "selectedItemIds": Schema.array(
+                    items: .string()
+                ),
+                "description": Schema.string()
+            ]
         )
         
-        completion(.success(outfit))
+        // Initialize the generative model with the schema
+        generativeModel = vertexAI.generativeModel(
+            modelName: "gemini-1.5-pro",
+            generationConfig: GenerationConfig(
+                temperature: 0.7,
+                responseMIMEType: "application/json",
+                responseSchema: outfitSchema
+            )
+        )
     }
     
-    private func createOutfitDescriptionWithVibe(items: [ClothingItem], vibe: String, weather: Weather) -> String {
-        let itemDescriptions = items.map { "\($0.color) \($0.type.rawValue.lowercased())" }
+    func getOutfitRecommendation(userId: String, vibe: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
+        // Filter out dirty items
+        let cleanItems = clothingItems.filter { !$0.dirty }
         
-        var description = "For a \(vibe.lowercased()) vibe in today's weather (\(Int(weather.temperature))°C, \(weather.condition.rawValue)), "
-        
-        if itemDescriptions.isEmpty {
-            description += "I couldn't find suitable items in your wardrobe."
-        } else if itemDescriptions.count == 1 {
-            description += "I recommend wearing your \(itemDescriptions[0])."
-        } else {
-            let lastItem = itemDescriptions.last!
-            let otherItems = itemDescriptions.dropLast().joined(separator: ", ")
-            description += "I recommend wearing your \(otherItems) and \(lastItem)."
+        if cleanItems.isEmpty {
+            completion(.failure(NSError(domain: "OutfitService", code: 2, userInfo: [NSLocalizedDescriptionKey: "No clean clothing items available"])))
+            return
         }
         
-        // Add vibe-specific tips
-        switch vibe.lowercased() {
-        case "casual":
-            description += " This outfit is perfect for a relaxed day while staying comfortable and stylish."
-        case "formal":
-            description += " This combination creates a polished look suitable for professional settings or special occasions."
-        case "athletic":
-            description += " This outfit provides the comfort and flexibility you need for an active day."
-        case "cozy":
-            description += " This ensemble prioritizes comfort while keeping you warm and looking put-together."
-        case "night out":
-            description += " This outfit strikes the perfect balance between style and comfort for your evening plans."
-        default:
-            break
+        // Generate outfit with AI
+        generateOutfitWithAI(userId: userId, vibe: vibe, weather: weather, clothingItems: cleanItems) { result in
+            completion(result)
+        }
+    }
+    private func generateOutfitWithAI(userId: String, vibe: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
+        guard let model = generativeModel else {
+            completion(.failure(NSError(domain: "OutfitService", code: 3, userInfo: [NSLocalizedDescriptionKey: "AI model not initialized"])))
+            return
         }
         
-        return description
+        // Create a structured prompt for the AI
+        let content = createStructuredPrompt(vibe: vibe, weather: weather, clothingItems: clothingItems)
+        
+        Task {
+            do {
+                let response = try await model.generateContent(content)
+                
+                if let jsonString = response.text,
+                   let jsonData = jsonString.data(using: .utf8) {
+                    
+                    // Parse the AI response
+                    let decoder = JSONDecoder()
+                    let aiResponse = try decoder.decode(OutfitAIResponse.self, from: jsonData)
+                    
+                    // Get the selected items based on the AI's recommendation
+                    let selectedItemIds = Set(aiResponse.selectedItemIds)
+                    let selectedItems = clothingItems.filter { selectedItemIds.contains($0.id) }
+                    
+                    // Create the outfit
+                    let outfit = Outfit(
+                        id: UUID().uuidString,
+                        userId: userId,
+                        items: selectedItems,
+                        weather: weather,
+                        createdAt: Date(),
+                        description: aiResponse.description,
+                        vibe: vibe
+                    )
+                    
+                    DispatchQueue.main.async {
+                        completion(.success(outfit))
+                    }
+                } else {
+                    throw NSError(domain: "OutfitService", code: 4, userInfo: [NSLocalizedDescriptionKey: "Invalid AI response format"])
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+    
+    private func createStructuredPrompt(vibe: String, weather: Weather, clothingItems: [ClothingItem]) -> String {
+        // Create a minimal representation of the clothing items
+        let itemsJson = clothingItems.map { item -> [String: Any] in
+            return [
+                "id": item.id,
+                "type": item.type.rawValue,
+                "color": item.color,
+                "name": item.name,
+                "weatherTags": item.weatherTags.map { $0.rawValue },
+                "styleTags": item.styleTags.map { $0.rawValue }
+            ]
+        }
+        
+        // Convert to JSON string - use compact printing to save tokens
+        let itemsJsonData = try? JSONSerialization.data(withJSONObject: itemsJson, options: [])
+        let itemsJsonString = itemsJsonData.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+        
+
+        let weatherJson: [String: Any] = [
+            "temperature": weather.temperature,
+            "condition": weather.condition.rawValue,
+            "humidity": weather.humidity,
+            "windSpeed": weather.windSpeed,
+            "location": weather.location
+        ]
+        
+        let weatherJsonData = try? JSONSerialization.data(withJSONObject: weatherJson, options: [.prettyPrinted])
+        let weatherJsonString = weatherJsonData.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
+        
+        // Create a concise prompt
+        return """
+        As a stylist, create an outfit for \(vibe) vibe in \(weatherJsonString) weather.
+        
+        Clothing items:
+        \(itemsJsonString)
+        
+        Rules:
+        - Cold (<10°C): include layers
+        - Hot (>25°C): light clothing
+        - Rainy: water-resistant items
+        - Match the \(vibe) vibe
+        - Only use items from the list
+        - use common clothing combinations for fashion
+        
+        Return JSON with:
+        {"selectedItemIds": [item IDs array], "description": "outfit description"}
+        """
     }
 }
 
-struct OutfitRequestBody: Codable {
-    let userId: String
-    let vibe: String
-    let weather: Weather
-    let clothingItems: [ClothingItem]
+// Simple struct to decode the AI response
+struct OutfitAIResponse: Codable {
+    let selectedItemIds: [String]
+    let description: String
 }

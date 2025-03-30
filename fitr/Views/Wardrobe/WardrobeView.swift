@@ -236,7 +236,7 @@ struct WardrobeView: View {
         
         isLoading = true
         
-        FirebaseService.shared.getClothingItems(for: userId) { result in
+        FirebaseService.shared.getCleanClothingItems(for: userId) { result in
             DispatchQueue.main.async {
                 self.isLoading = false
                 

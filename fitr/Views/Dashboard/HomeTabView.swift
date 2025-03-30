@@ -23,6 +23,7 @@ struct HomeTabView: View {
     let getOutfitForVibe: (String) -> Void
     let vibeColor: (String) -> Color
     let vibeIcon: (String) -> String
+    @State private var outfitError: String? = nil
     
     @EnvironmentObject var authManager: AuthenticationManager
     
@@ -257,15 +258,58 @@ struct HomeTabView: View {
     
     private var outfitRecommendationSection: some View {
         Group {
-            if let outfit = outfit {
-                       OutfitRecommendationView(outfit: outfit)
-                           .padding(.horizontal)
-                           .transition(.opacity.combined(with: .move(edge: .bottom)))
-                           // Use a UUID or timestamp as the animation value instead
-                           .animation(.spring(), value: UUID())
-                           // Or use a different animation approach:
-                           // .animation(.spring(), value: selectedVibe)
+            if let selectedVibe = selectedVibe, let weather = weather {
+                OutfitRecommendationView(weather: weather, vibe: selectedVibe)
+                    .padding(.horizontal)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    .animation(.spring(), value: UUID())
+            
+            } else if let error = outfitError {
+                // Error state
+                VStack(spacing: 15) {
+                    Image(systemName: "exclamationmark.circle")
+                        .font(.system(size: 30))
+                        .foregroundColor(.red.opacity(0.8))
+                    
+                    Text("Couldn't create outfit")
+                        .font(.headline)
+                        .foregroundColor(AppColors.davyGrey)
+                    
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(AppColors.davyGrey.opacity(0.8))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Button(action: {
+                        // Retry with the same vibe
+                        if let vibe = selectedVibe {
+                            getOutfitForVibe(vibe)
+                        }
+                    }) {
+                        HStack {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Try Again")
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(AppColors.springRain)
+                        .foregroundColor(.white)
+                        .cornerRadius(8)
+                    }
+                    .padding(.top, 5)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 25)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(0.7))
+                )
+                .padding(.horizontal)
+                .transition(.opacity)
+                .animation(.easeInOut, value: outfitError)
             } else if selectedVibe != nil {
+                // Loading state
                 VStack(spacing: 15) {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: vibeColor(selectedVibe!)))
@@ -274,6 +318,12 @@ struct HomeTabView: View {
                     Text("Creating your \(selectedVibe?.lowercased() ?? "") outfit...")
                         .font(.subheadline)
                         .foregroundColor(AppColors.davyGrey.opacity(0.8))
+                    
+                    Text("Finding the perfect pieces for today's weather")
+                        .font(.caption)
+                        .foregroundColor(AppColors.davyGrey.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 30)
@@ -285,11 +335,25 @@ struct HomeTabView: View {
                 .transition(.opacity)
                 .animation(.easeInOut, value: selectedVibe)
             } else {
-                Text("Select a vibe to get outfit recommendations")
-                    .font(.subheadline)
-                    .foregroundColor(AppColors.davyGrey.opacity(0.6))
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding()
+                // Initial state
+                VStack(spacing: 12) {
+                    Image(systemName: "tshirt.fill")
+                        .font(.system(size: 24))
+                        .foregroundColor(AppColors.davyGrey.opacity(0.5))
+                    
+                    Text("Select a vibe to get outfit recommendations")
+                        .font(.subheadline)
+                        .foregroundColor(AppColors.davyGrey.opacity(0.6))
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color.white.opacity(0.5))
+                        .strokeBorder(Color.gray.opacity(0.2), lineWidth: 1)
+                )
+                .padding(.horizontal)
             }
         }
     }
@@ -309,7 +373,6 @@ struct HomeTabView: View {
                 ) {
                     selectedTab = 1
                 }
-                
             }
             .padding(.horizontal)
         }

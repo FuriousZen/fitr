@@ -31,6 +31,9 @@ struct DashboardView: View {
     @State private var locationRetryCount = 0
     private let maxLocationRetries = 3
     
+    // Outfit caching
+    @State private var outfitCache: [String: Outfit] = [:]
+    
     // Available vibes
     private let vibes = ["Casual", "Formal", "Athletic", "Cozy", "Night Out"]
     
@@ -59,23 +62,55 @@ struct DashboardView: View {
             .onAppear {
                 loadData()
             }
-            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WardrobeUpdated"))) { _ in
-                       // Refresh data when wardrobe is updated
-                       wardrobeLastUpdated = Date()
-                       loadData()
-                   }
+            .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WardrobeUpdated"))) { notification in
+                print(weather, outfit, isWardrobeEmpty, selectedVibe, "hi")
+                // Check the operation type
+                if let operation = notification.userInfo?["operation"] as? String {
+                    switch operation {
+                    case "markDirty":
+                        // If an item was marked dirty, update the outfit without reloading
+                        if let itemId = notification.userInfo?["itemId"] as? String {
+                            updateOutfitAfterMarkingItemDirty(itemId: itemId)
+                        }
+                        wardrobeLastUpdated = Date()
+                        
+                    default:
+                        // For other operations (add, delete, etc.), reload everything
+                        wardrobeLastUpdated = Date()
+                        // Clear the cache when wardrobe changes
+                        outfitCache.removeAll()
+                        loadData()
+                    }
+                } else {
+                    // If no operation specified, reload everything (backward compatibility)
+                    wardrobeLastUpdated = Date()
+                    outfitCache.removeAll()
+                    loadData()
+                }
+            }
         }
     }
     
     private func loadData() {
+        // If we already have weather data and it's recent, don't reload everything
+        print(weather, outfit, isWardrobeEmpty, selectedVibe)
+        if weather != nil && outfit != nil && !isWardrobeEmpty && selectedVibe != nil {
+            
+            isLoading = false
+            return
+        }
+        
         isLoading = true
         errorMessage = nil
-        isWardrobeEmpty = false
-        locationRetryCount = 0
-        selectedVibe = nil
-        outfit = nil
-        vibeSelectionAppeared = false
-        vibeButtonsAppeared = false
+        
+        // Only reset these if we're actually reloading
+        if isWardrobeEmpty || weather == nil {
+            isWardrobeEmpty = false
+            locationRetryCount = 0
+            vibeSelectionAppeared = false
+            vibeButtonsAppeared = false
+        }
+        
         
         guard let userId = authManager.currentUser?.id else {
             errorMessage = "User not authenticated"
@@ -83,7 +118,7 @@ struct DashboardView: View {
             return
         }
         
-        // Load clothing items first
+        // Load all clothing items first
         FirebaseService.shared.getClothingItems(for: userId) { result in
             DispatchQueue.main.async {
                 switch result {
@@ -92,10 +127,20 @@ struct DashboardView: View {
                     self.isWardrobeEmpty = items.isEmpty
                     
                     if !items.isEmpty {
-                        self.loadWeatherData()
-                    } else {
-                        self.isLoading = false
-                    }
+                                      // Only load weather if we don't have it already
+                                      if self.weather == nil {
+                                          self.loadWeatherData()
+                                      } else {
+                                          // If we have weather but no outfit and a selected vibe,
+                                          // regenerate the outfit
+                                          if self.outfit == nil && self.selectedVibe != nil {
+                                              self.getOutfitForVibe(vibe: self.selectedVibe!)
+                                          }
+                                          self.isLoading = false
+                                      }
+                                  } else {
+                                      self.isLoading = false
+                                  }
                     
                 case .failure(let error):
                     self.errorMessage = "Failed to load wardrobe: \(error.localizedDescription)"
@@ -168,6 +213,12 @@ struct DashboardView: View {
             return
         }
         
+        // Check if we have a cached outfit for this vibe
+        if let cachedOutfit = outfitCache[vibe] {
+            self.outfit = cachedOutfit
+            return
+        }
+        
         // Clear previous outfit and show loading state
         outfit = nil
         
@@ -181,6 +232,8 @@ struct DashboardView: View {
                 switch result {
                 case .success(let outfit):
                     self.outfit = outfit
+                    // Cache the outfit
+                    self.outfitCache[vibe] = outfit
                 case .failure(let error):
                     self.errorMessage = "Outfit recommendation failed: \(error.localizedDescription)"
                 }
@@ -188,4 +241,22 @@ struct DashboardView: View {
         }
     }
     
+    private func updateOutfitAfterMarkingItemDirty(itemId: String) {
+        // Update the current outfit if it exists
+        if var currentOutfit = outfit {
+            currentOutfit.items.removeAll(where: { $0.id == itemId })
+            outfit = currentOutfit
+            
+            // Also update the cache
+            if let vibe = selectedVibe {
+                outfitCache[vibe] = currentOutfit
+            }
+        }
+        
+        // Remove the item from clothingItems as well
+        clothingItems.removeAll(where: { $0.id == itemId })
+    }
 }
+
+
+

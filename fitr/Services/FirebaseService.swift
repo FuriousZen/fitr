@@ -74,6 +74,40 @@ class FirebaseService {
             }
     }
     
+    func getCleanClothingItems(for userId: String, completion: @escaping (Result<[ClothingItem], Error>) -> Void) {
+        db.collection("users").document(userId).collection("clothingItems")
+            .whereField("dirty", isEqualTo: false)
+            .order(by: "created_at", descending: true)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                
+                let items = snapshot?.documents.compactMap { doc in
+                    try? doc.data(as: ClothingItem.self)
+                } ?? []
+                completion(.success(items))
+            }
+    }
+    
+    func getLaundryItems(for userId: String, completion: @escaping (Result<[ClothingItem], Error>) -> Void) {
+        db.collection("users").document(userId).collection("clothingItems")
+            .whereField("dirty", isEqualTo: true)
+            .order(by: "created_at", descending: true)
+            .getDocuments { snapshot, error in
+                if let error = error {
+                    completion(.failure(error))
+                    return
+                }
+                
+                let items = snapshot?.documents.compactMap { doc in
+                    try? doc.data(as: ClothingItem.self)
+                } ?? []
+                completion(.success(items))
+            }
+    }
+    
     func deleteClothingItem(item: ClothingItem, completion: @escaping (Result<Void, Error>) -> Void) {
         // Delete from Firestore
         db.collection("users").document(item.userId).collection("clothingItems").document(item.id).delete { error in
@@ -98,56 +132,26 @@ class FirebaseService {
         }
     }
     
-    // MARK: - Laundry Items
+    // MARK: - Laundry Management
     
-    func getLaundryItems(for userId: String, completion: @escaping (Result<[ClothingItem], Error>) -> Void) {
-        db.collection("users").document(userId).collection("laundryItems")
-            .order(by: "created_at", descending: true)
-            .getDocuments { snapshot, error in
-                if let error = error {
-                    completion(.failure(error))
-                    return
-                }
-                
-                let items = snapshot?.documents.compactMap { doc in
-                    try? doc.data(as: ClothingItem.self)
-                } ?? []
-                completion(.success(items))
-            }
-    }
-    
-    // In FirebaseService.swift
-
     func markItemAsDirty(item: ClothingItem, completion: @escaping (Result<Void, Error>) -> Void) {
         do {
             // Create a copy with updated dirty status
             var dirtyItem = item
             dirtyItem.dirty = true
             
-            let batch = db.batch()
+            // Update the item in the clothingItems collection
+            let itemRef = db.collection("users").document(item.userId)
+                .collection("clothingItems").document(item.id)
             
-            // Remove from clothingItems
-            let wardrobeRef = db.collection("users").document(item.userId)
-                              .collection("clothingItems").document(item.id)
-            batch.deleteDocument(wardrobeRef)
+            try itemRef.setData(from: dirtyItem)
             
-            // Add to laundryItems
-            let laundryRef = db.collection("users").document(item.userId)
-                              .collection("laundryItems").document(item.id)
-            try batch.setData(from: dirtyItem, forDocument: laundryRef)
-            
-            batch.commit { error in
-                if let error = error {
-                    completion(.failure(error))
-                } else {
-                    completion(.success(()))
-                }
-            }
+            completion(.success(()))
         } catch {
             completion(.failure(error))
         }
     }
-
+    
     func washItems(items: [ClothingItem], completion: @escaping (Result<Void, Error>) -> Void) {
         do {
             let batch = db.batch()
@@ -155,15 +159,11 @@ class FirebaseService {
             for var item in items {
                 item.dirty = false
                 
-                // Remove from laundryItems
-                let laundryRef = db.collection("users").document(item.userId)
-                                  .collection("laundryItems").document(item.id)
-                batch.deleteDocument(laundryRef)
+                // Update the item in the clothingItems collection
+                let itemRef = db.collection("users").document(item.userId)
+                    .collection("clothingItems").document(item.id)
                 
-                // Add back to clothingItems
-                let wardrobeRef = db.collection("users").document(item.userId)
-                                   .collection("clothingItems").document(item.id)
-                try batch.setData(from: item, forDocument: wardrobeRef)
+                try batch.setData(from: item, forDocument: itemRef)
             }
             
             batch.commit { error in
@@ -215,15 +215,15 @@ class FirebaseService {
     }
     
     func updateUserLocation(userId: String, location: String, completion: @escaping (Result<Void, Error>) -> Void) {
-            let db = Firestore.firestore()
-            db.collection("users").document(userId).updateData([
-                "location": location
-            ]) { error in
-                if let error = error {
-                    completion(.failure(error))
-                } else {
-                    completion(.success(()))
-                }
+        let db = Firestore.firestore()
+        db.collection("users").document(userId).updateData([
+            "location": location
+        ]) { error in
+            if let error = error {
+                completion(.failure(error))
+            } else {
+                completion(.success(()))
             }
         }
+    }
 }
