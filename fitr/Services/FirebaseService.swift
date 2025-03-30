@@ -142,4 +142,17 @@ class FirebaseService {
                 }
             }
     }
+    
+    func updateUserLocation(userId: String, location: String, completion: @escaping (Result<Void, Error>) -> Void) {
+            let db = Firestore.firestore()
+            db.collection("users").document(userId).updateData([
+                "location": location
+            ]) { error in
+                if let error = error {
+                    completion(.failure(error))
+                } else {
+                    completion(.success(()))
+                }
+            }
+        }
 }

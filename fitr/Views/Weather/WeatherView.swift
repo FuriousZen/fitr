@@ -18,7 +18,7 @@ struct WeatherView: View {
                     .foregroundColor(AppColors.davyGrey)
                 
                 VStack(alignment: .leading) {
-                    Text("\(Int(weather.temperature))°C")
+                    Text("\(Int(weather.temperature))°F")
                         .font(.system(size: 28, weight: .bold))
                         .foregroundColor(AppColors.davyGrey)
                     
@@ -43,7 +43,7 @@ struct WeatherView: View {
             HStack(spacing: 20) {
                 WeatherDetailItem(icon: "humidity", value: "\(weather.humidity)%", label: "Humidity")
                 
-                WeatherDetailItem(icon: "wind", value: "\(Int(weather.windSpeed)) m/s", label: "Wind")
+                WeatherDetailItem(icon: "wind", value: "\(Int(weather.windSpeed)) mph", label: "Wind")
             }
             .padding(.top, 5)
         }

@@ -106,52 +106,10 @@ struct DashboardView: View {
     }
     
     private func loadWeatherData() {
-        // Check location authorization status first
-        switch locationManager.authorizationStatus {
-        case .authorizedWhenInUse, .authorizedAlways:
-            // Continue with location-based weather
-            continueWithLocationWeather()
-        case .denied, .restricted:
-            // User denied location access, use default weather
-            self.errorMessage = "Location access denied. Using default weather."
-            self.useDefaultWeather()
-        case .notDetermined:
-            // Wait for user to respond to permission dialog
-            locationManager.requestLocation()
-            
-            // Check again after a delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                self.loadWeatherData()
-            }
-        @unknown default:
-            self.useDefaultWeather()
-        }
-    }
-
-    private func continueWithLocationWeather() {
-        // If we've exceeded retry attempts, use default weather
-        guard locationRetryCount < maxLocationRetries else {
-            self.useDefaultWeather()
-            return
-        }
+        isLoading = true
         
-        locationRetryCount += 1
-        
-        // If we have location, fetch weather immediately
-        if let location = locationManager.location {
-            fetchWeather(for: location)
-        }
-        // Otherwise request location and try again after delay
-        else {
-            locationManager.requestLocation()
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                self.continueWithLocationWeather()
-            }
-        }
-    }
-    private func fetchWeather(for location: CLLocation) {
-        WeatherService.shared.getWeather(for: location) { result in
+        // Use Charlottesville, Virginia as the fixed location
+        WeatherService.shared.getWeatherForCharlottesville { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let weather):
@@ -159,13 +117,14 @@ struct DashboardView: View {
                     self.isLoading = false
                 case .failure(let error):
                     // If weather API fails, try with default weather
+                    print("Weather error: \(error.localizedDescription)")
                     self.errorMessage = "Weather service unavailable. Using default recommendation."
                     self.useDefaultWeather()
                 }
             }
         }
     }
-    
+
     private func useDefaultWeather() {
         // Create default weather (moderate temperature)
         let defaultWeather = Weather(

@@ -34,7 +34,6 @@
 		94014E4D2D984BBE001D58C5 /* fitr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = fitr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		94014E5F2D984BC0001D58C5 /* fitrTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = fitrTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		94014E692D984BC0001D58C5 /* fitrUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = fitrUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		94494ACE2D98F0BD009DFA46 /* fitr.xctestplan */ = {isa = PBXFileReference; lastKnownFileType = text; path = fitr.xctestplan; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -87,7 +86,6 @@
 		94014E442D984BBE001D58C5 = {
 			isa = PBXGroup;
 			children = (
-				94494ACE2D98F0BD009DFA46 /* fitr.xctestplan */,
 				94014E4F2D984BBE001D58C5 /* fitr */,
 				94014E622D984BC0001D58C5 /* fitrTests */,
 				94014E6C2D984BC0001D58C5 /* fitrUITests */,

@@ -1,10 +1,3 @@
-//
-//  WeatherService.swift
-//  fitr
-//
-//  Created by Ryan Nguyen on 3/29/25.
-//
-
 import Foundation
 import CoreLocation
 
@@ -16,7 +9,8 @@ class WeatherService {
     private var cacheTimestamp: Date?
     private let cacheValidityDuration: TimeInterval = 3600 // 1 hour
     
-    func getWeather(for location: CLLocation, completion: @escaping (Result<Weather, Error>) -> Void) {
+    // Method to get weather for Charlottesville, VA
+    func getWeatherForCharlottesville(completion: @escaping (Result<Weather, Error>) -> Void) {
         // Check if we have valid cached weather data
         if let cachedWeather = cachedWeather,
            let cacheTimestamp = cacheTimestamp,
@@ -25,15 +19,11 @@ class WeatherService {
             return
         }
         
-        // Otherwise fetch from API
-        let latitude = location.coordinate.latitude
-        let longitude = location.coordinate.longitude
-        
+        // Otherwise fetch from API using city name
         var components = URLComponents(string: baseURL)
         components?.queryItems = [
-            URLQueryItem(name: "lat", value: "\(latitude)"),
-            URLQueryItem(name: "lon", value: "\(longitude)"),
-            URLQueryItem(name: "units", value: "metric"),
+            URLQueryItem(name: "q", value: "Charlottesville,VA,US"),
+            URLQueryItem(name: "units", value: "imperial"),
             URLQueryItem(name: "appid", value: APIKeys.openWeatherMapKey)
         ]
         
@@ -65,7 +55,7 @@ class WeatherService {
                     location: weatherResponse.name,
                     date: Date()
                 )
-                
+                print(weather)
                 // Cache the result
                 self.cachedWeather = weather
                 self.cacheTimestamp = Date()
@@ -76,6 +66,7 @@ class WeatherService {
             }
         }.resume()
     }
+    
     
     private func mapWeatherCondition(_ condition: String) -> WeatherCondition {
         switch condition.lowercased() {

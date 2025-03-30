@@ -79,11 +79,11 @@ class OutfitService {
         var appropriateWeatherTags: [WeatherTag] = []
         
         // Temperature-based tags
-        if weather.temperature > 25 {
+        if weather.temperature > 77 {
             appropriateWeatherTags.append(.hot)
-        } else if weather.temperature > 18 {
+        } else if weather.temperature > 64 {
             appropriateWeatherTags.append(.warm)
-        } else if weather.temperature > 10 {
+        } else if weather.temperature > 50 {
             appropriateWeatherTags.append(.cool)
         } else {
             appropriateWeatherTags.append(.cold)
