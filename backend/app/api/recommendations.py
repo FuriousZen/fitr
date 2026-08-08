@@ -9,7 +9,7 @@ from flask import Blueprint
 from ..auth import current_user_id, require_user
 from ..errors import NotFound, ServiceUnavailable, ValidationError
 from ..extensions import db
-from ..models import ClothingItem, Recommendation, RecommendationFeedback
+from ..models import Recommendation, RecommendationFeedback
 from ..services import services
 from ..services.clip import ClipUnavailableError
 from ..services.weather import WeatherUnavailableError
@@ -46,20 +46,18 @@ def _resolve_weather(data: dict) -> tuple[dict, float]:
     return result.data, (time.perf_counter() - started) * 1000.0
 
 
-def _expand_options(options: list[dict], items_by_id: dict[str, ClothingItem]) -> list[dict]:
-    expanded = []
-    for opt in options:
-        expanded.append(
-            {
-                **opt,
-                "items": [
-                    items_by_id[i].to_dict()
-                    for i in opt.get("item_ids", [])
-                    if i in items_by_id
-                ],
-            }
-        )
-    return expanded
+def _expand_options(options: list[dict], items_by_id: dict[str, dict]) -> list[dict]:
+    """Inline the full item payload into each option so the client does not
+    have to cross-reference ``candidates`` itself."""
+    return [
+        {
+            **opt,
+            "items": [
+                items_by_id[i] for i in opt.get("item_ids", []) if i in items_by_id
+            ],
+        }
+        for opt in options
+    ]
 
 
 @bp.post("")
@@ -115,8 +113,10 @@ def create_recommendation():
     db.session.add(record)
     db.session.commit()
 
-    items_by_id = {c["id"]: db.session.get(ClothingItem, c["id"]) for c in outcome.candidates}
-    items_by_id = {k: v for k, v in items_by_id.items() if v is not None}
+    # The candidate payloads are already fully materialised dicts from the
+    # shortlist query, so expand from those rather than issuing one SELECT per
+    # candidate.
+    items_by_id = {c["id"]: c for c in outcome.candidates}
 
     payload = record.to_dict()
     payload["options"] = _expand_options(outcome.options, items_by_id)

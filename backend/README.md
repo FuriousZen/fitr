@@ -281,6 +281,40 @@ repeat requests essentially always hit.
 
 ---
 
+## Is the HNSW index actually used?
+
+Worth checking rather than assuming — a small table, or a filter the planner
+dislikes, will quietly produce a sequential scan. With 5,000 rows:
+
+```sql
+EXPLAIN (ANALYZE, COSTS OFF)
+SELECT id FROM clothing_items
+WHERE user_id = 'demo' AND dirty = false
+ORDER BY embedding <=> '[...]'::vector
+LIMIT 12;
+```
+```
+ Limit (actual time=0.231..0.255 rows=12 loops=1)
+   ->  Index Scan using ix_clothing_items_embedding_hnsw on clothing_items
+         Order By: (embedding <=> $0)
+         Filter: ((NOT dirty) AND ((user_id)::text = 'demo'::text))
+ Execution Time: 0.279 ms
+```
+
+The index is used, and the `user_id`/`dirty` predicate is applied as a filter
+on top of it.
+
+> **Caveat for multi-tenant vector search.** Because that predicate is a
+> *post*-filter on the index scan, pgvector walks the graph in global distance
+> order and discards rows belonging to other users. When one user's garments
+> are a small fraction of the table, it may have to traverse far more of the
+> graph to find `k` survivors, and can return fewer than `k` if `hnsw.ef_search`
+> is exhausted first. It is correct here at this scale, but a deployment with
+> many users and large wardrobes should raise `hnsw.ef_search`, or partition by
+> user, and re-check recall. No recall measurement is claimed.
+
+---
+
 ## Degraded modes
 
 Missing credentials degrade the service; they never crash it.
