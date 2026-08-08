@@ -52,3 +52,15 @@ GoogleService-Info.plist
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# --- Python backend ---
+.venv-backend/
+backend/.venv/
+backend/.env
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+backend/instance/
+backend/bench-results/
