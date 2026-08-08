@@ -591,17 +591,22 @@ final class BackendService {
 
 // MARK: - Completion-handler bridge
 
-/// The existing services are completion-handler based. These wrappers let
-/// call sites adopt the backend without being rewritten for async/await.
+/// The existing services are completion-handler based. These wrappers let call
+/// sites adopt the backend without being rewritten for async/await.
+///
+/// Deliberately given distinct names rather than overloading the async methods
+/// with a trailing `completion:`. Overload sets that differ only by a defaulted
+/// argument are an easy way to get an "ambiguous use of" error, and this file
+/// has not been compiled — distinct names remove the risk entirely.
 extension BackendService {
 
-    func classify(
-        image: UIImage,
+    func classifyImage(
+        _ image: UIImage,
         completion: @escaping (Result<BackendClassification, Error>) -> Void
     ) {
         Task {
             do {
-                let result = try await classify(image: image)
+                let result = try await self.classify(image: image)
                 await MainActor.run { completion(.success(result)) }
             } catch {
                 await MainActor.run { completion(.failure(error)) }
@@ -609,14 +614,21 @@ extension BackendService {
         }
     }
 
-    func recommend(
+    func recommendOutfits(
         vibe: String,
         weather: Weather,
+        numberOfOptions: Int = 3,
         completion: @escaping (Result<BackendRecommendation, Error>) -> Void
     ) {
         Task {
             do {
-                let result = try await recommend(vibe: vibe, weather: weather)
+                let result = try await self.recommend(
+                    vibe: vibe,
+                    latitude: nil,
+                    longitude: nil,
+                    weather: weather,
+                    numberOfOptions: numberOfOptions
+                )
                 await MainActor.run { completion(.success(result)) }
             } catch {
                 await MainActor.run { completion(.failure(error)) }
@@ -624,14 +636,32 @@ extension BackendService {
         }
     }
 
-    func fetchItems(
+    func loadItems(
         dirty: Bool? = nil,
         completion: @escaping (Result<[ClothingItem], Error>) -> Void
     ) {
         Task {
             do {
-                let items = try await fetchItems(dirty: dirty).map { $0.asClothingItem() }
+                let items = try await self.fetchItems(dirty: dirty).map { $0.asClothingItem() }
                 await MainActor.run { completion(.success(items)) }
+            } catch {
+                await MainActor.run { completion(.failure(error)) }
+            }
+        }
+    }
+
+    func submitFeedback(
+        recommendationId: String,
+        accepted: Bool,
+        rank: Int? = nil,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        Task {
+            do {
+                try await self.submitFeedback(
+                    recommendationId: recommendationId, accepted: accepted, rank: rank, note: nil
+                )
+                await MainActor.run { completion(.success(())) }
             } catch {
                 await MainActor.run { completion(.failure(error)) }
             }

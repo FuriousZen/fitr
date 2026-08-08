@@ -177,6 +177,15 @@ backend/                    Flask service — see backend/README.md
 written in a Linux container with no Swift toolchain, no Xcode and no macOS.
 They are type-checked by eye only. Expect to fix small errors on first build.
 
+The project's own build settings were checked for compatibility, at least:
+`SWIFT_VERSION = 5.0` (so Swift 6 strict-concurrency errors do not apply) and
+`IPHONEOS_DEPLOYMENT_TARGET = 18.2` (so `URLSession.data(for:)`, `if let`
+shorthand and async `getIDToken()` are all available). The completion-handler
+wrappers were given distinct names — `classifyImage`, `recommendOutfits`,
+`loadItems` — rather than overloading the async methods with a trailing
+`completion:`, because overload sets differing only by a defaulted argument are
+a common source of "ambiguous use of" errors that could not be caught here.
+
 Files added (additive — nothing existing calls them, so the app behaves exactly
 as before until you wire them up):
 
