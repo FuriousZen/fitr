@@ -124,3 +124,40 @@ def test_label_prompts_are_encoded_once_and_memoized(app, services):
     assert services.encoder.text_calls == calls_after_first, (
         "the fixed label vocabulary must not be re-encoded per request"
     )
+
+
+def test_text_cache_is_bounded_and_lru(app, services):
+    encoder = services.encoder
+    encoder._text_cache_max = 2
+
+    encoder.encode_texts_cached(["a"])
+    encoder.encode_texts_cached(["b"])
+    encoder.encode_texts_cached(["c"])
+
+    assert len(encoder._text_cache) == 2
+    assert "a" not in encoder._text_cache, "least-recently-used entry must be evicted"
+
+
+def test_text_cache_counts_hits_and_misses(app, services):
+    encoder = services.encoder
+    before_misses = encoder.text_cache_misses
+
+    encoder.encode_texts_cached(["query one"])
+    encoder.encode_texts_cached(["query one"])
+
+    assert encoder.text_cache_misses == before_misses + 1
+    assert encoder.text_cache_hits >= 1
+
+
+def test_repeat_recommendation_reuses_the_query_embedding(client, auth, make_item, services):
+    make_item(name="tee", type="T-Shirt")
+    make_item(name="jeans", type="Jeans")
+    weather = {"temperature": 42.0, "condition": "Rainy", "units": "imperial"}
+
+    client.post("/api/v1/recommendations", json={"vibe": "casual", "weather": weather}, headers=auth)
+    calls_after_first = services.encoder.text_calls
+    client.post("/api/v1/recommendations", json={"vibe": "casual", "weather": weather}, headers=auth)
+
+    assert services.encoder.text_calls == calls_after_first, (
+        "an identical situation must not re-encode the query text"
+    )

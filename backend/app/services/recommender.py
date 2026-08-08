@@ -204,7 +204,9 @@ class Recommender:
         query_text = build_query_text(vibe, weather)
 
         started = time.perf_counter()
-        query_vec = self.encoder.encode_text(query_text)
+        # Cached: query text is drawn from vibe x temperature band x condition,
+        # a space small enough that repeat requests almost always hit.
+        query_vec = self.encoder.encode_text_cached(query_text)
         timings["clip"] = (time.perf_counter() - started) * 1000.0
 
         started = time.perf_counter()

@@ -25,6 +25,7 @@ import io
 import logging
 import threading
 import time
+from collections import OrderedDict
 from dataclasses import dataclass
 
 import numpy as np
@@ -78,6 +79,7 @@ class ClipEncoder:
         expected_dim: int | None = None,
         torch_threads: int = 0,
         local_files_only: bool = False,
+        text_cache_size: int = 1024,
     ) -> None:
         self.model_id = model_id
         self.device = device
@@ -91,8 +93,15 @@ class ClipEncoder:
         self._processor = None
         self._lock = threading.Lock()
         self._load_ms: float | None = None
-        self._text_cache: dict[str, np.ndarray] = {}
+        #: Bounded LRU over text embeddings. Covers both the fixed label
+        #: vocabularies and recommendation query strings — the latter are drawn
+        #: from a small space (vibe x temperature band x condition), so this
+        #: hits constantly in practice while staying bounded.
+        self._text_cache: OrderedDict[str, np.ndarray] = OrderedDict()
+        self._text_cache_max = max(1, int(text_cache_size))
         self._text_cache_lock = threading.Lock()
+        self.text_cache_hits = 0
+        self.text_cache_misses = 0
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -191,19 +200,41 @@ class ClipEncoder:
         return self.encode_texts([text])[0]
 
     def encode_texts_cached(self, texts: list[str]) -> np.ndarray:
-        """``encode_texts`` with an unbounded in-process memo.
+        """``encode_texts`` behind a bounded LRU.
 
-        Used for the fixed label vocabularies (clothing types, colours, style
-        tags), which are small, constant, and re-encoded on every zero-shot
-        classification. Not used for user-supplied query text.
+        Used for the fixed label vocabularies (re-encoded on every zero-shot
+        classification) and for recommendation query strings.
         """
-        missing = [t for t in texts if t not in self._text_cache]
+        with self._text_cache_lock:
+            missing = [t for t in texts if t not in self._text_cache]
+            self.text_cache_hits += len(texts) - len(missing)
+            self.text_cache_misses += len(missing)
+
         if missing:
+            # Encode outside the lock: this is the expensive part and holding
+            # the lock across it would serialise unrelated requests.
             encoded = self.encode_texts(missing)
             with self._text_cache_lock:
                 for text, vec in zip(missing, encoded):
                     self._text_cache[text] = vec
-        return np.stack([self._text_cache[t] for t in texts])
+                    self._text_cache.move_to_end(text)
+                while len(self._text_cache) > self._text_cache_max:
+                    self._text_cache.popitem(last=False)
+
+        with self._text_cache_lock:
+            out = []
+            for t in texts:
+                vec = self._text_cache.get(t)
+                if vec is None:
+                    # Evicted between encode and read (only possible if the
+                    # batch exceeds the cache size); fall back to a direct call.
+                    return self.encode_texts(texts)
+                self._text_cache.move_to_end(t)
+                out.append(vec)
+        return np.stack(out)
+
+    def encode_text_cached(self, text: str) -> np.ndarray:
+        return self.encode_texts_cached([text])[0]
 
     def health(self) -> dict:
         return {
@@ -212,6 +243,9 @@ class ClipEncoder:
             "loaded": self.loaded,
             "dim": self.dim,
             "load_ms": round(self._load_ms, 2) if self._load_ms is not None else None,
-            "text_labels_cached": len(self._text_cache),
+            "text_cache_entries": len(self._text_cache),
+            "text_cache_capacity": self._text_cache_max,
+            "text_cache_hits": self.text_cache_hits,
+            "text_cache_misses": self.text_cache_misses,
             "local_files_only": self.local_files_only,
         }

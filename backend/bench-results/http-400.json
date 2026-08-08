@@ -1,0 +1,193 @@
+{
+  "environment": {
+    "python": "3.12.13",
+    "platform": "Linux-6.12.76-linuxkit-aarch64-with-glibc2.36",
+    "machine": "aarch64",
+    "processor": "aarch64",
+    "cpu_count": 15,
+    "torch": "2.13.0+cpu",
+    "torch_threads": 15,
+    "transformers": "5.14.1",
+    "flask": "3.1.3",
+    "sqlalchemy": "2.0.51",
+    "pgvector_python": "0.5.0"
+  },
+  "meta": {
+    "mode": "HTTP against http://127.0.0.1:8000 (includes socket + WSGI overhead)",
+    "user_id": "bench-e9ada0ab",
+    "run_salt": "e9ada0ab",
+    "pgvector": "0.8.6",
+    "gemini_configured": false,
+    "weather_configured": false,
+    "seed_seconds": 15.6,
+    "warm_tier_distribution": {
+      "l1": 50
+    }
+  },
+  "parameters": {
+    "items": 400,
+    "reps": 50
+  },
+  "measurements": [
+    {
+      "name": "wardrobe item create, cold (CLIP inference + insert)",
+      "unit": "ms",
+      "n": 400,
+      "min": 22.1,
+      "p50": 29.02,
+      "p90": 60.64,
+      "p95": 89.24,
+      "max": 203.49,
+      "mean": 38.03,
+      "note": "first time these bytes are seen; includes the CLIP forward pass"
+    },
+    {
+      "name": "POST /embeddings, cache MISS (runs CLIP)",
+      "unit": "ms",
+      "n": 50,
+      "min": 20.43,
+      "p50": 23.72,
+      "p90": 46.8,
+      "p95": 60.32,
+      "max": 83.82,
+      "mean": 31.17,
+      "note": "cold path"
+    },
+    {
+      "name": "POST /embeddings, cache HIT",
+      "unit": "ms",
+      "n": 50,
+      "min": 0.54,
+      "p50": 0.61,
+      "p90": 0.69,
+      "p95": 0.7,
+      "max": 0.75,
+      "mean": 0.62,
+      "note": "warm; tiers served: {'l1': 50}"
+    },
+    {
+      "name": "POST /vision/classify, cache MISS",
+      "unit": "ms",
+      "n": 50,
+      "min": 21.12,
+      "p50": 25.95,
+      "p90": 85.22,
+      "p95": 108.72,
+      "max": 229.47,
+      "mean": 42.79,
+      "note": "cold path"
+    },
+    {
+      "name": "POST /vision/classify, cache HIT",
+      "unit": "ms",
+      "n": 50,
+      "min": 0.61,
+      "p50": 0.68,
+      "p90": 0.9,
+      "p95": 1.11,
+      "max": 202.53,
+      "mean": 4.8,
+      "note": "same image again; this is the 'repeat request' path"
+    },
+    {
+      "name": "POST /wardrobe/search, pgvector k-NN over 400 items",
+      "unit": "ms",
+      "n": 50,
+      "min": 8.27,
+      "p50": 9.24,
+      "p90": 26.2,
+      "p95": 35.17,
+      "max": 47.49,
+      "mean": 13.32,
+      "note": ""
+    },
+    {
+      "name": "  of which: SQL retrieval only",
+      "unit": "ms",
+      "n": 50,
+      "min": 1.87,
+      "p50": 2.01,
+      "p90": 2.21,
+      "p95": 2.27,
+      "max": 3.42,
+      "mean": 2.08,
+      "note": ""
+    },
+    {
+      "name": "POST /recommendations, first time for this situation",
+      "unit": "ms",
+      "n": 50,
+      "min": 13.15,
+      "p50": 14.49,
+      "p90": 51.47,
+      "p95": 58.6,
+      "max": 63.24,
+      "mean": 22.04,
+      "note": "EXCLUDES the Gemini call: no API key in this environment, so the heuristic ranker produced the options"
+    },
+    {
+      "name": "POST /recommendations, repeat of an identical situation",
+      "unit": "ms",
+      "n": 50,
+      "min": 5.58,
+      "p50": 5.74,
+      "p90": 6.1,
+      "p95": 6.21,
+      "max": 6.24,
+      "mean": 5.81,
+      "note": "EXCLUDES the Gemini call: no API key in this environment, so the heuristic ranker produced the options; query-text embedding served from cache"
+    }
+  ],
+  "server_side_recommendation_latency": {
+    "breakdown_ms": {
+      "clip": {
+        "max": 55.27,
+        "p50": 0.01,
+        "p90": 19.79,
+        "p95": 43.76
+      },
+      "generation": {
+        "max": 0.04,
+        "p50": 0.02,
+        "p90": 0.02,
+        "p95": 0.02
+      },
+      "retrieval": {
+        "max": 3.69,
+        "p50": 1.8,
+        "p90": 2.23,
+        "p95": 2.32
+      },
+      "weather": {
+        "max": 0.0,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p95": 0.0
+      }
+    },
+    "generator": "heuristic",
+    "samples": 101,
+    "total_ms": {
+      "max": 57.68,
+      "p50": 1.89,
+      "p90": 22.1,
+      "p95": 46.25
+    }
+  },
+  "cache": {
+    "postgres_cache": {
+      "mean_cold_compute_ms": 39.69,
+      "rows": 2550,
+      "total_l2_hits": 216
+    },
+    "process_cache": {
+      "hit_rate": 0.1165,
+      "hits_l1": 81,
+      "hits_l2": 15,
+      "l1_capacity": 512,
+      "l1_entries": 512,
+      "misses": 728,
+      "requests": 824
+    }
+  }
+}
