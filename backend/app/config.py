@@ -2,7 +2,7 @@
 
 No secret has a default. If a key is absent the corresponding service reports
 itself as unconfigured and the API degrades in a documented way rather than
-failing at import time — that is what lets the test suite run without any real
+failing at import time. That is what lets the test suite run without any real
 credentials.
 """
 

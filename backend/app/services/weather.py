@@ -9,7 +9,7 @@ Endpoint per https://openweathermap.org/current :
 (F). The iOS app has always used ``imperial``, so that is the default here.
 
 Responses are cached in-process with a TTL (default 1 h), keyed on the rounded
-coordinate or the city string — matching, and replacing, the 1-hour cache that
+coordinate or the city string, matching and replacing the 1-hour cache that
 ``WeatherService.swift`` did client-side.
 """
 
@@ -92,7 +92,7 @@ class WeatherService:
     def _key(lat: float | None, lon: float | None, q: str | None, units: str) -> str:
         if q:
             return f"q:{q.strip().lower()}:{units}"
-        # Two decimal places is ~1.1 km — finer than weather varies, coarse
+        # Two decimal places is ~1.1 km: finer than weather varies, coarse
         # enough that a phone's jittering GPS still hits the same cache entry.
         return f"c:{round(float(lat), 2)}:{round(float(lon), 2)}:{units}"
 

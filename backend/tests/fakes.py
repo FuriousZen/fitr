@@ -27,9 +27,9 @@ class FakeModels:
 class FakeGeminiClient:
     """Stands in for ``google.genai.Client``.
 
-    Matches only the surface this app uses —
+    Matches only the surface this app uses,
     ``client.models.generate_content(model=..., contents=..., config=...)``
-    returning an object with ``.text`` — which was verified against the real
+    returning an object with ``.text``, which was verified against the real
     google-genai 2.17.0 signature by introspection.
     """
 

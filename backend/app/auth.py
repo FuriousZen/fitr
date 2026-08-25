@@ -3,7 +3,7 @@
 Two modes, selected by ``FITR_AUTH_MODE``:
 
 ``header`` (default)
-    Trust ``X-User-Id``. Development and test only — anyone can claim any user
+    Trust ``X-User-Id``. Development and test only: anyone can claim any user
     id. This is what lets the benchmark and the test suite run with no
     credentials.
 
@@ -15,7 +15,7 @@ Two modes, selected by ``FITR_AUTH_MODE``:
     and it lines up with the Firebase Authentication the iOS app already has.
 
 The verification path has NOT been exercised against a real Firebase project in
-this environment — there are no credentials here. It is written from the
+this environment. There are no credentials here. It is written from the
 documented API surface and covered only by a test that asserts a bad token is
 rejected.
 """

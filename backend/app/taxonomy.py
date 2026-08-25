@@ -1,4 +1,4 @@
-"""Clothing taxonomy — kept byte-identical to the Swift enums.
+"""Clothing taxonomy, kept byte-identical to the Swift enums.
 
 Mirrors ``fitr/Models/ClothingItem.swift`` (``ClothingType``, ``WeatherTag``,
 ``StyleTag``) and ``fitr/Models/Weather.swift`` (``WeatherCondition``). The raw

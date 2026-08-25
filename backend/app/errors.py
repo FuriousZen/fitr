@@ -1,6 +1,6 @@
 """Uniform JSON error envelope.
 
-Every failure — expected or not — comes back as
+Every failure, expected or not, comes back as
 ``{"error": {"code": "...", "message": "..."}}`` with an appropriate status, so
 the Swift client only ever has to decode one error shape.
 """

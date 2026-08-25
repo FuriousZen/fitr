@@ -4,8 +4,8 @@ Two tables hold vectors, deliberately:
 
 ``image_embeddings``
     The *cache*. Content-addressed by SHA-256 of the raw image bytes and keyed
-    additionally by model id, so re-uploading identical bytes — or a second user
-    uploading the same stock photo — never re-runs CLIP. Global, not per-user.
+    additionally by model id, so re-uploading identical bytes (or a second user
+    uploading the same stock photo) never re-runs CLIP. Global, not per-user.
 
 ``clothing_items.embedding``
     A denormalised copy of the same vector on the row that is actually searched,

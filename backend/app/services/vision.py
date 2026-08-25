@@ -2,7 +2,7 @@
 
 This is the "CLIP image recognition" half of the pipeline: given an image
 embedding, score it against text embeddings of the label vocabulary and take
-the softmax. No training, no labelled data — the same zero-shot transfer
+the softmax. No training, no labelled data: the same zero-shot transfer
 protocol the CLIP paper uses, with the paper's "a photo of a ..." prompt
 template.
 

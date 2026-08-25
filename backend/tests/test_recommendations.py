@@ -202,6 +202,21 @@ def test_location_without_a_weather_key_is_503(client, auth, wardrobe):
     assert resp.status_code == 503
 
 
+@pytest.mark.parametrize(
+    "weather",
+    [
+        {"temperature": "not-a-number"},
+        {"temperature": None},
+        {"temperature": 70.0, "condition": {"nested": "object"}},
+        {"temperature": 70.0, "units": 123},
+        {"temperature": 70.0, "units": "fahrenheit"},
+    ],
+)
+def test_malformed_weather_object_is_422_not_500(client, auth, wardrobe, weather):
+    resp = client.post("/api/v1/recommendations", json={"weather": weather}, headers=auth)
+    assert resp.status_code == 422, resp.get_json()
+
+
 def test_recommendation_is_persisted_and_retrievable(client, auth, wardrobe):
     created = client.post(
         "/api/v1/recommendations", json={"weather": COLD_RAIN}, headers=auth

@@ -18,9 +18,9 @@ generation via Gemini.
 The recommendation path is:
 
 1. Resolve weather (coordinates or city, 1-hour TTL cache).
-2. Build a sentence describing the situation — *"a photo of a casual outfit to
-   wear in cold rainy weather"* — and embed it with CLIP's **text** tower.
-3. Cosine k-NN in Postgres against the CLIP **image** embeddings of that user's
+2. Build a sentence describing the situation (*"a photo of a casual outfit to
+   wear in cold rainy weather"*) and embed it with CLIP's text tower.
+3. Cosine k-NN in Postgres against the CLIP image embeddings of that user's
    clean garments, using an HNSW index.
 4. Hand the shortlist (not the whole wardrobe) to Gemini, which returns up to
    three ranked outfits as structured JSON.
@@ -52,7 +52,7 @@ CPU-only. No GPU is used or required.
 
 ### 1. PostgreSQL with pgvector
 
-pgvector is **not** in Debian 12's apt repositories (`apt-cache policy
+pgvector is not in Debian 12's apt repositories (`apt-cache policy
 postgresql-15-pgvector` returns nothing), so it is built from source here. On a
 distro that carries it, `sudo apt install postgresql-$(pg_config --version |
 grep -oE '[0-9]+' | head -1)-pgvector` is the shorter path.
@@ -71,7 +71,7 @@ cd /tmp/pgvector && make && sudo make install
 > get `Illegal instruction`.
 
 Create the role, the databases, and the extension. `CREATE EXTENSION vector`
-requires **superuser** — pgvector is not a trusted extension (there is no
+requires superuser. pgvector is not a trusted extension (there is no
 `trusted = true` in `vector.control`), so it cannot be created by the
 application role:
 
@@ -85,7 +85,7 @@ sudo -u postgres psql -d fitr_test -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 
 ### 2. Python environment
 
-torch must come from the CPU wheel index — the default PyPI wheel drags in
+torch must come from the CPU wheel index. The default PyPI wheel drags in
 several GB of CUDA packages that are useless here.
 
 ```bash
@@ -134,11 +134,11 @@ recomputing the same embedding N times.
 
 | Mode | Mechanism | Use |
 |---|---|---|
-| `header` (default) | `X-User-Id: <uid>` | Development and tests only — anyone can claim any uid. |
+| `header` (default) | `X-User-Id: <uid>` | Development and tests only; anyone can claim any uid. |
 | `firebase` | `Authorization: Bearer <Firebase ID token>` | Production. Verified with `google.oauth2.id_token.verify_firebase_token` against Google's public certs and `FITR_FIREBASE_PROJECT_ID`. |
 
-> The `firebase` path has **never been exercised against a real Firebase
-> project** — there are no credentials in the development environment. It is
+> The `firebase` path has never been exercised against a real Firebase
+> project. There are no credentials in the development environment. It is
 > written from the documented API and is covered only by a test asserting that
 > an unverifiable token is rejected. Verify it yourself before deploying.
 
@@ -187,7 +187,7 @@ Send it again and `cache_tier` becomes `l1` with `elapsed_ms` around 0.3.
 ```
 
 > These confidences are a softmax over CLIP cosine similarities. Zero-shot
-> accuracy has **not** been evaluated on any clothing benchmark; do not read
+> accuracy has not been evaluated on any clothing benchmark; do not read
 > them as validated classifier probabilities.
 
 ### Wardrobe
@@ -231,8 +231,8 @@ curl -s -X POST localhost:8000/api/v1/recommendations \
 ```
 
 Supply either `lat`+`lon`, or `q`, or a complete `weather` object (which skips
-the OpenWeatherMap call entirely — useful when the client already has it, and
-what the tests use).
+the OpenWeatherMap call entirely, which is useful when the client already has
+it, and what the tests use).
 
 The response carries `generator`, which says what actually produced the
 ranking: `gemini`, `heuristic`, `gemini_empty_fallback`, or `none` (empty
@@ -250,8 +250,8 @@ Feedback: `{"accepted": true, "accepted_rank": 1}` where `accepted_rank` is the
 | `GET` | `/api/v1/metrics/latency?generator=` | Nearest-rank percentiles over stored recommendations. |
 | `GET` | `/api/v1/metrics/cache` | L1 and L2 cache statistics. |
 
-**`top_k_acceptance` is `null` until real users submit feedback, and nothing in
-this repository writes synthetic feedback.** The endpoint is instrumentation
+`top_k_acceptance` is `null` until real users submit feedback, and nothing in
+this repository writes synthetic feedback. The endpoint is instrumentation
 for measuring an acceptance rate, not a source of one.
 
 ---
@@ -274,7 +274,7 @@ uploading the same file. Including `model_id` in the key means changing
 index can serve per-user k-NN without a join. Deleting an item does not delete
 the shared cache row.
 
-There is a third cache: a bounded LRU over **text** embeddings, covering both
+There is a third cache: a bounded LRU over text embeddings, covering both
 the fixed label vocabulary and recommendation query strings. Query text is
 drawn from vibe × temperature-band × condition, a small enough space that
 repeat requests essentially always hit.
@@ -283,7 +283,7 @@ repeat requests essentially always hit.
 
 ## Is the HNSW index actually used?
 
-Worth checking rather than assuming — a small table, or a filter the planner
+Worth checking rather than assuming. A small table, or a filter the planner
 dislikes, will quietly produce a sequential scan. With 5,000 rows:
 
 ```sql
@@ -304,7 +304,7 @@ LIMIT 12;
 The index is used, and the `user_id`/`dirty` predicate is applied as a filter
 on top of it.
 
-> **Caveat for multi-tenant vector search.** Because that predicate is a
+> Caveat for multi-tenant vector search. Because that predicate is a
 > *post*-filter on the index scan, pgvector walks the graph in global distance
 > order and discards rows belonging to other users. When one user's garments
 > are a small fraction of the table, it may have to traverse far more of the
@@ -336,38 +336,36 @@ These were verified against current documentation and then re-verified by
 introspecting the installed packages. Several contradict what the code would
 look like if written from memory.
 
-**transformers 5.x changed the CLIP feature API.** `get_image_features()` now
+transformers 5.x changed the CLIP feature API. `get_image_features()` now
 returns `BaseModelOutputWithPooling`, not a tensor. The 512-d projected
 embedding is `.pooler_output`; `.last_hidden_state` is the 768-d
 pre-projection output. `app/services/clip.py` handles both the 4.x and 5.x
 shapes, and `tests/test_clip_real.py` pins the behaviour.
 
-**CLIP features are not normalised.** `CLIPModel.forward` normalises
-internally before computing logits, so the feature helpers return unnormalised
-vectors. Everything is L2-normalised at write time here, which makes cosine
+CLIP features are not normalised. `CLIPModel.forward` normalises internally
+before computing logits, so the feature helpers return unnormalised vectors. Everything is L2-normalised at write time here, which makes cosine
 distance and `1 - dot` equivalent.
 
-**Model choice: HuggingFace `transformers`, not `open_clip_torch`.** Both ship
-ViT-B/32 at 512 dims and ~605 MB, so there is no quality or size difference.
-open_clip has the more stable API (and a built-in `normalize=True`), which is a
-genuine argument in its favour given the churn above; transformers wins here
-only because torchvision is already required by the v5 image pipeline, so
-open_clip's extra chain (notably `timm`) buys nothing. The version is pinned
-`>=5,<6` because an unpinned upgrade across the 4→5 boundary silently changes
-the return type.
+On model choice, this uses HuggingFace `transformers` rather than
+`open_clip_torch`. Both ship ViT-B/32 at 512 dims and ~605 MB, so there is no
+quality or size difference. open_clip has the more stable API (and a built-in
+`normalize=True`), which is a genuine argument in its favour given the churn
+above; transformers wins here only because torchvision is already required by
+the v5 image pipeline, so open_clip's extra chain (notably `timm`) buys
+nothing. The version is pinned `>=5,<6` because an unpinned upgrade across the
+4→5 boundary silently changes the return type.
 
-**`google-generativeai` is dead.** Deprecated, end-of-life 2025-11-30. This
-uses the unified `google-genai` SDK (`from google import genai`).
+`google-generativeai` is dead. Deprecated, end-of-life 2025-11-30. This uses
+the unified `google-genai` SDK (`from google import genai`).
 
-**The model ids in the Swift app are retired.** `gemini-2.0-flash` was shut
-down 2026-06-01 and the `gemini-1.5-*` family earlier, so both
+The model ids in the Swift app are retired. `gemini-2.0-flash` was shut down
+2026-06-01 and the `gemini-1.5-*` family earlier, so both
 `ClothingClassifierService.swift` and `OutfitService.swift` currently name
 models that no longer exist. The backend defaults to `gemini-3.6-flash`.
 
-**`types.HttpOptions(timeout=…)` is milliseconds**, not seconds.
+`types.HttpOptions(timeout=…)` is in milliseconds, not seconds.
 
-**pgvector needs superuser for `CREATE EXTENSION`** — it is not a trusted
-extension.
+pgvector needs superuser for `CREATE EXTENSION`; it is not a trusted extension.
 
 ---
 
@@ -375,11 +373,11 @@ extension.
 
 ```bash
 cd backend
-../.venv-backend/bin/python -m pytest            # 157 tests
+../.venv-backend/bin/python -m pytest            # 162 tests
 ../.venv-backend/bin/python -m pytest --run-clip # + 9 against real CLIP weights
 ```
 
-Tests run against a **real** PostgreSQL + pgvector (`fitr_test`); the vector
+Tests run against a real PostgreSQL + pgvector (`fitr_test`); the vector
 behaviour is the point, so the database is not stubbed. CLIP is faked by
 default (a deterministic hash-derived encoder with the same interface) because
 loading real weights costs ~4 s and 600 MB; `--run-clip` swaps in the genuine
@@ -404,7 +402,7 @@ cd backend
 
 The script prints the host, CPU count and library versions alongside the
 numbers, seeds a wardrobe, and measures cold vs warm paths at each tier. A
-per-run salt makes the "cold" images genuinely novel — without it the
+per-run salt makes the "cold" images genuinely novel. Without it the
 persistent L2 cache would serve them and the script would measure the warm path
 while labelling it cold.
 

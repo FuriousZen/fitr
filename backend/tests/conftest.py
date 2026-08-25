@@ -1,8 +1,8 @@
 """Test fixtures.
 
 Runs against a real PostgreSQL + pgvector database (``FITR_TEST_DATABASE_URL``,
-default ``fitr_test``). The vector logic — cosine ordering, the HNSW index, the
-L2 cache — is the whole point of this backend, so stubbing the database out
+default ``fitr_test``). The vector logic (cosine ordering, the HNSW index, the
+L2 cache) is the whole point of this backend, so stubbing the database out
 would test nothing worth testing.
 
 CLIP is a different matter: loading the weights costs ~5 s and ~600 MB. By

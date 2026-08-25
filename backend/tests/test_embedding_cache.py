@@ -1,4 +1,4 @@
-"""Cache-tier behaviour — the mechanism behind the cold/warm latency claim."""
+"""Cache-tier behaviour: the mechanism behind the cold/warm latency claim."""
 
 from __future__ import annotations
 

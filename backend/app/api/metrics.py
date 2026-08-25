@@ -1,8 +1,8 @@
 """Measured metrics.
 
 Both endpoints report only what has actually been recorded in this database.
-When there is no data they return ``null`` rather than a placeholder number —
-an unmeasured rate must never be indistinguishable from a measured one.
+When there is no data they return ``null`` rather than a placeholder number.
+An unmeasured rate must never be indistinguishable from a measured one.
 """
 
 from __future__ import annotations

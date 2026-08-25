@@ -2,15 +2,15 @@
 //  AppConfig.swift
 //  fitr
 //
-//  ⚠️ UNCOMPILED / UNVERIFIED. Written on Linux with no Swift toolchain, no
+//  UNCOMPILED / UNVERIFIED. Written on Linux with no Swift toolchain, no
 //  Xcode and no macOS available. It has never been type-checked or built.
 //  Review it in Xcode before relying on it.
 //
 //  Runtime configuration, resolved from (in order):
 //
-//    1. The process environment — set these in the scheme's
+//    1. The process environment. Set these in the scheme's
 //       Run > Arguments > Environment Variables for local development.
-//    2. Info.plist — set via build settings / an .xcconfig so that different
+//    2. Info.plist. Set via build settings / an .xcconfig so that different
 //       configurations (Debug/Release) can point at different backends.
 //
 //  Nothing here contains a secret. Keys and URLs are supplied at run time or

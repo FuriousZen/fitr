@@ -157,7 +157,7 @@ def delete_item(item_id: str):
 @bp.post("/wash")
 @require_user
 def wash_items():
-    """Mark items clean in bulk — the backend counterpart to the laundry view."""
+    """Mark items clean in bulk. The backend counterpart to the laundry view."""
     user_id = current_user_id()
     data = form_or_json()
     item_ids = get_str_list(data, "item_ids")

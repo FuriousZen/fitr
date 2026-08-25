@@ -26,7 +26,7 @@ def wardrobe(make_item):
     """Wide enough to actually yield three distinct options.
 
     The heuristic ranker builds one outfit per (top, bottom) pairing, so a
-    wardrobe with a single top can only ever produce a single option — three
+    wardrobe with a single top can only ever produce a single option. Three
     tops and three bottoms are needed before an ``accepted_rank`` of 3 is a
     valid thing for a user to report.
     """

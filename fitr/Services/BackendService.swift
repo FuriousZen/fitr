@@ -2,18 +2,18 @@
 //  BackendService.swift
 //  fitr
 //
-//  ⚠️ UNCOMPILED / UNVERIFIED. Written on Linux with no Swift toolchain, no
+//  UNCOMPILED / UNVERIFIED. Written on Linux with no Swift toolchain, no
 //  Xcode and no macOS available. It has never been type-checked or built.
 //  Expect to fix small compile errors on first build. Nothing in the existing
-//  app calls into this file yet, so adding it cannot change current behaviour
-//  — it is purely additive until you wire it up.
+//  app calls into this file yet, so adding it cannot change current behaviour.
+//  It is purely additive until you wire it up.
 //
 //  Client for the fitr Flask backend (see backend/README.md for the API).
 //
 //  Why this exists: the app currently calls Gemini directly through
 //  FirebaseVertexAI using model ids `gemini-2.0-flash` and `gemini-1.5-pro`.
-//  Both are retired — gemini-2.0-flash was shut down on 2026-06-01 and the
-//  1.5 family earlier — and `FirebaseVertexAI` itself was removed from
+//  Both are retired: gemini-2.0-flash was shut down on 2026-06-01 and the
+//  1.5 family earlier. `FirebaseVertexAI` itself was removed from
 //  firebase-ios-sdk in 12.0.0 (replaced by `FirebaseAI`, since renamed to the
 //  `FirebaseAILogic` module). Routing these calls through the backend means
 //  the model id, the API keys and the SDK version all live server-side, where
@@ -353,7 +353,7 @@ final class BackendService {
 
     /// Builds a multipart/form-data body. `UIImage` is JPEG-encoded at the
     /// same 0.7 quality `FirebaseService.uploadClothingImage` uses, so the
-    /// bytes — and therefore the backend's content-addressed cache key — match
+    /// bytes, and therefore the backend's content-addressed cache key, match
     /// what gets uploaded to Storage.
     private func multipartRequest(
         path: String,
@@ -597,7 +597,7 @@ final class BackendService {
 /// Deliberately given distinct names rather than overloading the async methods
 /// with a trailing `completion:`. Overload sets that differ only by a defaulted
 /// argument are an easy way to get an "ambiguous use of" error, and this file
-/// has not been compiled — distinct names remove the risk entirely.
+/// has not been compiled. Distinct names remove the risk entirely.
 extension BackendService {
 
     func classifyImage(

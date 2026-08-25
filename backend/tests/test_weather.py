@@ -2,7 +2,7 @@
 
 There is no OpenWeatherMap key in this environment, so every HTTP interaction
 is intercepted by ``responses``. The payloads below are shaped from the
-documented schema at https://openweathermap.org/current — they are constructed
+documented schema at https://openweathermap.org/current. They are constructed
 fixtures, not recordings of real traffic.
 """
 

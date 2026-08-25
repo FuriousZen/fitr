@@ -18,17 +18,50 @@ from .helpers import form_or_json, get_bool, get_float, get_int, get_str
 bp = Blueprint("recommendations", __name__, url_prefix="/api/v1/recommendations")
 
 
+#: The unit systems OpenWeatherMap accepts, and the only ones
+#: ``temperature_band`` knows how to convert from.
+_UNIT_SYSTEMS = ("standard", "metric", "imperial")
+
+
+def _validated_weather(explicit: dict) -> dict:
+    """Check a client-supplied weather object before the recommender sees it.
+
+    ``build_query_text`` calls ``float()`` on the temperature and ``.lower()``
+    on the condition. Anything that is not a number or not a string reaches
+    those calls and surfaces as a 500, so the types are checked here and
+    reported as a validation error instead.
+    """
+    cleaned = dict(explicit)
+
+    try:
+        cleaned["temperature"] = float(cleaned["temperature"])
+    except (TypeError, ValueError):
+        raise ValidationError("weather.temperature must be a number") from None
+
+    condition = cleaned.get("condition") or "Cloudy"
+    if not isinstance(condition, str):
+        raise ValidationError("weather.condition must be a string")
+    cleaned["condition"] = condition
+
+    units = cleaned.get("units") or services().weather.units
+    if units not in _UNIT_SYSTEMS:
+        raise ValidationError(
+            f"weather.units must be one of {', '.join(_UNIT_SYSTEMS)}"
+        )
+    cleaned["units"] = units
+
+    cleaned.setdefault("humidity", 0)
+    cleaned.setdefault("wind_speed", 0.0)
+    cleaned.setdefault("location", "")
+    return cleaned
+
+
 def _resolve_weather(data: dict) -> tuple[dict, float]:
     """Weather from an explicit object, or fetched from coordinates/city."""
     svc = services()
     explicit = data.get("weather")
     if isinstance(explicit, dict) and "temperature" in explicit:
-        explicit.setdefault("condition", "Cloudy")
-        explicit.setdefault("units", svc.weather.units)
-        explicit.setdefault("humidity", 0)
-        explicit.setdefault("wind_speed", 0.0)
-        explicit.setdefault("location", "")
-        return explicit, 0.0
+        return _validated_weather(explicit), 0.0
 
     lat = get_float(data, "lat")
     lon = get_float(data, "lon")

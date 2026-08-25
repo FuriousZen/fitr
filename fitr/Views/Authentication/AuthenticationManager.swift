@@ -1,13 +1,9 @@
+//
 //  AuthenticationManager.swift
-
 //  fitr
-
 //
-
 //  Created by Ryan Nguyen on 3/29/25.
-
 //
-// In AuthenticationManager.swift
 
 import SwiftUI
 import Firebase

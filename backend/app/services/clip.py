@@ -1,6 +1,6 @@
 """CLIP image/text encoder.
 
-Library choice — HuggingFace ``transformers`` over ``open_clip_torch``:
+Library choice, HuggingFace ``transformers`` over ``open_clip_torch``:
 
 * ``transformers`` + ``torchvision`` were already required for the image
   pipeline, so open_clip's extra dependency chain (notably ``timm``) buys
@@ -14,7 +14,7 @@ Library choice — HuggingFace ``transformers`` over ``open_clip_torch``:
 
 Both encoders L2-normalise before returning, so cosine similarity over stored
 vectors is a dot product and ``vector_cosine_ops`` behaves as expected.
-``get_image_features(...).pooler_output`` is *not* normalised by the model —
+``get_image_features(...).pooler_output`` is *not* normalised by the model.
 CLIPModel.forward normalises internally before computing logits, so callers
 using the feature helpers must do it themselves.
 """
@@ -94,7 +94,7 @@ class ClipEncoder:
         self._lock = threading.Lock()
         self._load_ms: float | None = None
         #: Bounded LRU over text embeddings. Covers both the fixed label
-        #: vocabularies and recommendation query strings — the latter are drawn
+        #: vocabularies and recommendation query strings. The latter are drawn
         #: from a small space (vibe x temperature band x condition), so this
         #: hits constantly in practice while staying bounded.
         self._text_cache: OrderedDict[str, np.ndarray] = OrderedDict()
