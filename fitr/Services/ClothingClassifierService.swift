@@ -22,7 +22,7 @@ class ClothingClassifier {
         
 
         generativeModel = vertexAI.generativeModel(
-            modelName: "gemini-2.0-flash",
+            modelName: "gemini-3.7-flash",
             generationConfig: GenerationConfig(
                 responseMIMEType: "application/json",
                 responseSchema: clothingSchema

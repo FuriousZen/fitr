@@ -358,10 +358,10 @@ nothing. The version is pinned `>=5,<6` because an unpinned upgrade across the
 `google-generativeai` is dead. Deprecated, end-of-life 2025-11-30. This uses
 the unified `google-genai` SDK (`from google import genai`).
 
-The model ids in the Swift app are retired. `gemini-2.0-flash` was shut down
-2026-06-01 and the `gemini-1.5-*` family earlier, so both
-`ClothingClassifierService.swift` and `OutfitService.swift` currently name
-models that no longer exist. The backend defaults to `gemini-3.6-flash`.
+The Swift app names its own model ids: `gemini-3.7-flash` in
+`ClothingClassifierService.swift` and `gemini-3.1-pro` in `OutfitService.swift`.
+Those are set independently of this backend, which defaults to
+`gemini-3.6-flash` and is overridden with `FITR_GEMINI_MODEL`.
 
 `types.HttpOptions(timeout=…)` is in milliseconds, not seconds.
 

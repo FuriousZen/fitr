@@ -226,13 +226,14 @@ What you do need to do:
 
 ### Why you will want to move Gemini server-side
 
-The app currently calls Gemini through `FirebaseVertexAI` with model ids
-`gemini-2.0-flash` and `gemini-1.5-pro`. Both are retired: `gemini-2.0-flash`
-was shut down on 2026-06-01 and the 1.5 family earlier, so those calls will
-fail against the live API regardless of anything in this branch. Separately,
-`FirebaseVertexAI` was removed from firebase-ios-sdk in 12.0.0 and replaced by
-`FirebaseAI` (module since renamed to `FirebaseAILogic`); this project pins
-11.10.0, where the old module still exists but the models it points at do not.
+The app calls Gemini through `FirebaseVertexAI` with model ids
+`gemini-3.7-flash` and `gemini-3.1-pro`, both current on Vertex AI. Keeping
+them current means editing Swift and shipping a build every time Google retires
+a model, which is what happened to the `gemini-2.0-flash` and `gemini-1.5-pro`
+ids these replaced. `FirebaseVertexAI` was also removed from firebase-ios-sdk
+in 12.0.0 and replaced by `FirebaseAI` (module since renamed to
+`FirebaseAILogic`); this project pins 11.10.0, where the old module still
+exists, so any SDK upgrade forces this code to move anyway.
 
 Two ways out:
 

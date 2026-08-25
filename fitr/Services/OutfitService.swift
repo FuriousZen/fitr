@@ -27,7 +27,7 @@ class OutfitService {
         )
         
         generativeModel = vertexAI.generativeModel(
-            modelName: "gemini-1.5-pro",
+            modelName: "gemini-3.1-pro",
             generationConfig: GenerationConfig(
                 temperature: 0.7,
                 responseMIMEType: "application/json",

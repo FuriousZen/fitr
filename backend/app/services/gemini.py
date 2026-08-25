@@ -13,10 +13,9 @@ Verified against the installed google-genai 2.17.0 by introspection:
   coerces it to ``types.Schema``.
 * ``types.HttpOptions(timeout=...)`` is in **milliseconds**, not seconds.
 
-Note on model ids: ``gemini-2.0-flash`` was shut down 2026-06-01 and all
-``gemini-1.5-*`` models are long retired, so the values still baked into
-``ClothingClassifierService.swift`` and ``OutfitService.swift`` are dead. The
-default here is ``gemini-3.6-flash``; override with ``FITR_GEMINI_MODEL``.
+Note on model ids: the Swift app names ``gemini-3.7-flash`` and
+``gemini-3.1-pro`` directly, independently of this module. The default here is
+``gemini-3.6-flash``; override with ``FITR_GEMINI_MODEL``.
 
 There is no API key in this environment, so no live call has ever been made
 from this repo. Every test exercises this module against a fake client.

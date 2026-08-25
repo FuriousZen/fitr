@@ -10,14 +10,15 @@
 //
 //  Client for the fitr Flask backend (see backend/README.md for the API).
 //
-//  Why this exists: the app currently calls Gemini directly through
-//  FirebaseVertexAI using model ids `gemini-2.0-flash` and `gemini-1.5-pro`.
-//  Both are retired: gemini-2.0-flash was shut down on 2026-06-01 and the
-//  1.5 family earlier. `FirebaseVertexAI` itself was removed from
-//  firebase-ios-sdk in 12.0.0 (replaced by `FirebaseAI`, since renamed to the
-//  `FirebaseAILogic` module). Routing these calls through the backend means
-//  the model id, the API keys and the SDK version all live server-side, where
-//  they can be changed without shipping a new build.
+//  Why this exists: the app calls Gemini directly through FirebaseVertexAI
+//  using model ids `gemini-3.7-flash` and `gemini-3.1-pro`. Pinning ids in
+//  Swift means a new build every time Google retires one, which is how the
+//  previous `gemini-2.0-flash` and `gemini-1.5-pro` ids went dead.
+//  `FirebaseVertexAI` itself was removed from firebase-ios-sdk in 12.0.0
+//  (replaced by `FirebaseAI`, since renamed to the `FirebaseAILogic` module).
+//  Routing these calls through the backend means the model id, the API keys
+//  and the SDK version all live server-side, where they can be changed
+//  without shipping a new build.
 //
 
 import Foundation
