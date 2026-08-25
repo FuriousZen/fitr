@@ -1,4 +1,4 @@
-//  Dash.swift
+//  DashboardView.swift
 //  fitr
 //
 //  Created by Ryan Nguyen on 3/29/25.

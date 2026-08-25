@@ -11,7 +11,7 @@ Verified against the installed google-genai 2.17.0 by introspection:
 * ``types.GenerateContentConfig(response_mime_type=..., response_schema=...)``
   where ``response_schema`` accepts a lowercase JSON-Schema-style dict and
   coerces it to ``types.Schema``.
-* ``types.HttpOptions(timeout=...)`` is in **milliseconds**, not seconds.
+* ``types.HttpOptions(timeout=...)`` takes milliseconds, not seconds.
 
 Note on model ids: the Swift app names ``gemini-3.7-flash`` and
 ``gemini-3.1-pro`` directly, independently of this module. The default here is

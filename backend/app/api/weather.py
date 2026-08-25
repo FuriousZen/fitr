@@ -1,8 +1,8 @@
 """Weather passthrough.
 
-Exists so the API key lives on the server rather than in the iOS bundle. The
-current ``Constants.swift`` ships a placeholder that has to be replaced with a
-real key at build time, which puts the key in the app binary.
+Exists so the API key can live on the server rather than in the iOS bundle.
+``Constants.swift`` resolves the key at run time from the scheme environment
+or Info.plist, and anything in Info.plist ships inside the .ipa.
 """
 
 from __future__ import annotations

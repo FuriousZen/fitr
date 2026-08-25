@@ -7,10 +7,9 @@ class WeatherService {
     private let baseURL = "https://api.openweathermap.org/data/2.5/weather"
     private var cachedWeather: Weather?
     private var cacheTimestamp: Date?
-    private let cacheValidityDuration: TimeInterval = 3600 // 1 hour
+    private let cacheValidityDuration: TimeInterval = 3600
     
     func getWeatherForCharlottesville(completion: @escaping (Result<Weather, Error>) -> Void) {
-        // Check if we have valid cached weather data
         if let cachedWeather = cachedWeather,
            let cacheTimestamp = cacheTimestamp,
            Date().timeIntervalSince(cacheTimestamp) < cacheValidityDuration {
@@ -53,7 +52,6 @@ class WeatherService {
                     date: Date()
                 )
                 print(weather)
-                // cache the result
                 self.cachedWeather = weather
                 self.cacheTimestamp = Date()
                 

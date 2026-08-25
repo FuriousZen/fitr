@@ -6,7 +6,6 @@ class ClothingClassifier {
     private var generativeModel: GenerativeModel?
     
     init() {
-        //structured object
         let clothingSchema = Schema.object(
             properties: [
                 "type": Schema.enumeration(values: ClothingType.allCases.map { $0.rawValue }),
@@ -42,7 +41,6 @@ class ClothingClassifier {
                 
                 let response = try await model.generateContent(image, promptText)
                 
-                // parsing
                 if let jsonString = response.text,
                    let jsonData = jsonString.data(using: .utf8) {
                     let decoder = JSONDecoder()
@@ -63,7 +61,7 @@ class ClothingClassifier {
     }
 }
 
-// model to decode AI res
+// Decoded from the model's JSON response.
 struct ClothingClassificationResult: Codable {
     let type: String
     let color: String

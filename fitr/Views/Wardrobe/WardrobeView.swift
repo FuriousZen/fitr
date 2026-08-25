@@ -167,7 +167,6 @@ struct WardrobeView: View {
         
         ToolbarItem(placement: .navigationBarTrailing) {
             Button(action: toggleGridLayout) {
-                // Check the current grid size to determine which icon to show
                 if case let .adaptive(min, _) = gridColumns.first?.size, min == 120 {
                     Image(systemName: "square.grid.3x3")
                 } else {

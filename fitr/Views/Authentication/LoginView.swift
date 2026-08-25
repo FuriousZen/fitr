@@ -171,10 +171,10 @@ struct LoginView: View {
                         .background(Color.red.opacity(0.8), in: RoundedRectangle(cornerRadius: 10))
                         .shadow(radius: 10)
                         .multilineTextAlignment(.center)
-                        .opacity(errorMessage.isEmpty ? 0 : 1) // Fade-in effect when error appears
-                        .scaleEffect(errorMessage.isEmpty ? 1 : 1.1) // Subtle scaling effect
-                        .animation(.easeInOut(duration: 0.3), value: errorMessage) // Animate changes
-                        .transition(.opacity) // Smooth transition for appearing/disappearing error
+                        .opacity(errorMessage.isEmpty ? 0 : 1)
+                        .scaleEffect(errorMessage.isEmpty ? 1 : 1.1)
+                        .animation(.easeInOut(duration: 0.3), value: errorMessage)
+                        .transition(.opacity)
                 }
 
 

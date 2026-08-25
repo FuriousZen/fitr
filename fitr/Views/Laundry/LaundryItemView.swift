@@ -19,7 +19,6 @@ struct LaundryItemView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             ZStack(alignment: .topTrailing) {
-                // Item image
                 KFImage(URL(string: item.imageURL))
                     .resizable()
                     .aspectRatio(contentMode: .fill)

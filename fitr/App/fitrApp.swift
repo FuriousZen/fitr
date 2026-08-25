@@ -35,5 +35,5 @@ struct fitrApp: App {
 
 #Preview {
     AddClothingView()
-        .environmentObject(AuthenticationManager()) // Create a new instance for preview
+        .environmentObject(AuthenticationManager())
 }

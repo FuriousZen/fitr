@@ -1,4 +1,4 @@
-# fitr backend — pinned to versions actually installed and tested on
+# fitr backend, pinned to versions actually installed and tested on
 # Python 3.12 / Debian 12 (aarch64) / PostgreSQL 15 + pgvector 0.8.6.
 #
 # torch/torchvision must come from the CPU wheel index, which cannot be

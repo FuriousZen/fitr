@@ -589,7 +589,6 @@ struct AddClothingView: View {
         self.isUploading = false
         self.errorMessage = "Failed to upload image: \(error.localizedDescription)"
         
-        // Show error toast
         self.toastMessage = "Failed to upload image"
         self.isSuccessToast = false
         self.showToast = true

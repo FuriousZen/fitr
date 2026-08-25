@@ -2,7 +2,7 @@
 
     weather  ->  CLIP text query  ->  pgvector k-NN shortlist  ->  Gemini  ->  ranked outfits
 
-CLIP is load-bearing, not decorative: the shortlist that reaches the LLM is
+CLIP does the retrieval work here: the shortlist that reaches the LLM is
 chosen by cosine similarity between a CLIP *text* embedding of the situation
 ("a casual outfit for cool rainy weather") and the CLIP *image* embeddings of
 the user's own garments. That keeps the prompt at a fixed size no matter how

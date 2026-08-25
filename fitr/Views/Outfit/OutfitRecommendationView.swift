@@ -184,7 +184,6 @@ struct OutfitRecommendationView: View {
     private func itemCard(item: ClothingItem) -> some View {
         VStack {
             HStack(alignment: .top, spacing: 12) {
-                // Item image
                 KFImage(URL(string: item.imageURL))
                     .resizable()
                     .aspectRatio(contentMode: .fill)

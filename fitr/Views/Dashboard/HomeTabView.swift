@@ -123,7 +123,7 @@ struct HomeTabView: View {
                         .foregroundColor(AppColors.davyGrey)
                 }
                 
-                Text("Let's build your virtual wardrobe")
+                Text("Build your virtual wardrobe")
                     .font(.body)
                     .foregroundColor(AppColors.davyGrey.opacity(0.8))
                     .multilineTextAlignment(.center)
@@ -146,7 +146,6 @@ struct HomeTabView: View {
             }
             .padding(.top, 10)
             
-            // Optional tip
             Text("Tip: Add a few items to get personalized outfit recommendations")
                 .font(.caption)
                 .foregroundColor(AppColors.davyGrey.opacity(0.6))
@@ -238,7 +237,6 @@ struct HomeTabView: View {
         )
         .padding(.horizontal)
         .onAppear {
-            // Trigger animations when view appears
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 withAnimation {
                     vibeSelectionAppeared = true
@@ -316,7 +314,7 @@ struct HomeTabView: View {
                         .font(.subheadline)
                         .foregroundColor(AppColors.davyGrey.opacity(0.8))
                     
-                    Text("Finding the perfect pieces for today's weather")
+                    Text("Matching pieces to today's weather")
                         .font(.caption)
                         .foregroundColor(AppColors.davyGrey.opacity(0.6))
                         .multilineTextAlignment(.center)

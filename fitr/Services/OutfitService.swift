@@ -81,7 +81,8 @@ class OutfitService {
                             selectedTypes[item.type] = item
                         }
                     }
-                    //one top n bottom
+                    // Make sure the outfit has a top and a bottom, filling in from
+                    // the wardrobe if the model left one out.
                     let mutuallyExclusiveTypes: [[ClothingType]] = [
                         [.tShirt, .shirt],
                         [.pants, .shorts]
@@ -137,7 +138,7 @@ class OutfitService {
             ]
         }
         
-        // convert to JSON string - use compact printing to save tokens
+        // Compact JSON keeps the prompt short.
         let itemsJsonData = try? JSONSerialization.data(withJSONObject: itemsJson, options: [])
         let itemsJsonString = itemsJsonData.flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         
