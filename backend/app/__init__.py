@@ -31,7 +31,9 @@ def create_app(config_object=None, **overrides) -> Flask:
     )
 
     db.init_app(app)
-    CORS(app, origins=app.config.get("CORS_ORIGINS", "*"))
+    cors_origins = list(app.config.get("CORS_ORIGINS") or [])
+    if cors_origins:
+        CORS(app, origins=cors_origins)
 
     # Import inside the factory so `app.models` is registered on the metadata
     # exactly once per process and there is no import cycle with extensions.

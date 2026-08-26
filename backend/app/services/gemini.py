@@ -4,7 +4,7 @@ Uses the current unified SDK, ``google-genai`` (``from google import genai``).
 The old ``google-generativeai`` package is deprecated and reached end of life on
 2025-11-30; it must not be used.
 
-Verified against the installed google-genai 2.17.0 by introspection:
+Against google-genai 2.17.0:
 
 * ``genai.Client(api_key=...)``
 * ``client.models.generate_content(model=..., contents=..., config=...)``
@@ -13,12 +13,13 @@ Verified against the installed google-genai 2.17.0 by introspection:
   coerces it to ``types.Schema``.
 * ``types.HttpOptions(timeout=...)`` takes milliseconds, not seconds.
 
-Note on model ids: the Swift app names ``gemini-3.7-flash`` and
-``gemini-3.1-pro`` directly, independently of this module. The default here is
-``gemini-3.6-flash``; override with ``FITR_GEMINI_MODEL``.
+Note on model ids: the Swift app's device-side fallback names
+``gemini-3.7-flash`` and ``gemini-3.1-pro`` directly, independently of this
+module. The default here is ``gemini-3.6-flash``; override with
+``FITR_GEMINI_MODEL``.
 
-There is no API key in this environment, so no live call has ever been made
-from this repo. Every test exercises this module against a fake client.
+The test suite drives this module through a fake client with the same
+signature, so no test needs an API key.
 """
 
 from __future__ import annotations

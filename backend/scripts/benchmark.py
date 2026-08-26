@@ -1,25 +1,24 @@
 #!/usr/bin/env python
-"""Measure real latency. Every number in the README comes from this script.
+"""Measure backend latency at each tier.
 
     python scripts/benchmark.py --items 200 --reps 30
     python scripts/benchmark.py --items 1500 --reps 30 --json bench.json
     python scripts/benchmark.py --http http://127.0.0.1:8000 --items 200
 
-What is and is not measured
----------------------------
+What it measures
+----------------
 * CLIP inference, the two cache tiers, pgvector k-NN retrieval and the whole
-  request path around them are measured for real, on CPU.
-* The Gemini call is NOT measured. There is no API key in this environment, so
-  the recommendation figures below cover every stage EXCEPT the LLM round trip
-  and use the heuristic ranker. Any end-to-end number that includes Gemini is
-  therefore not something this script can produce, and it will say so.
+  request path around them, on CPU.
+* The Gemini call, only when a key is configured. Without one the heuristic
+  ranker runs and the recommendation rows cover every stage except the LLM
+  round trip; the output says which of the two it measured.
 * Default mode drives the Flask test client in-process, which excludes HTTP
-  framing, socket and WSGI-server overhead. Pass --http to measure a real
+  framing, socket and WSGI-server overhead. Pass --http to measure a running
   server over loopback instead. Both are single-process, single-machine
-  numbers on whatever container this runs in, not production figures.
+  numbers for whatever host this runs on.
 
-The script prints the hardware and versions it ran on, because a latency
-number without them means nothing.
+The script prints the hardware and versions it ran on alongside the numbers,
+because a latency figure without them means nothing.
 """
 
 from __future__ import annotations
@@ -385,10 +384,13 @@ def run(args) -> dict:
     samples.append(knn_retrieval)
 
     # -- recommendations --------------------------------------------------
-    rec_note = (
-        "EXCLUDES the Gemini call: no API key in this environment, so the "
-        "heuristic ranker produced the options"
-    )
+    if meta["gemini_configured"]:
+        rec_note = "INCLUDES the Gemini round trip"
+    else:
+        rec_note = (
+            "EXCLUDES the Gemini call: no API key was configured, so the "
+            "heuristic ranker produced the options"
+        )
     cold_rec = Sample(
         "POST /recommendations, first time for this situation", "ms", note=rec_note
     )
@@ -509,8 +511,7 @@ def render(result: dict) -> str:
         lines += [
             "IMPORTANT: no Gemini API key was present. Every /recommendations number",
             "above therefore EXCLUDES the LLM round trip and reflects the heuristic",
-            "ranker. A true end-to-end figure including Gemini cannot be produced in",
-            "this environment and none is reported.",
+            "ranker. Set GEMINI_API_KEY and rerun for an end-to-end figure.",
             "",
         ]
     return "\n".join(lines)

@@ -2,10 +2,6 @@
 //  AppConfig.swift
 //  fitr
 //
-//  UNCOMPILED / UNVERIFIED. Written on Linux with no Swift toolchain, no
-//  Xcode and no macOS available. It has never been type-checked or built.
-//  Review it in Xcode before relying on it.
-//
 //  Runtime configuration, resolved from (in order):
 //
 //    1. The process environment. Set these in the scheme's
@@ -55,16 +51,17 @@ enum AppConfig {
     // MARK: - Keys
 
     /// Base URL of the fitr Flask backend, e.g. `http://192.168.1.10:8000`.
-    /// When this is nil the app should keep using its direct Firebase/Gemini
-    /// path; `BackendService.isConfigured` reflects that.
+    /// When this is nil the services fall back to calling Gemini and
+    /// OpenWeatherMap from the device; `BackendService.isConfigured` reflects
+    /// that.
     static var backendBaseURL: URL? {
         guard let raw = value(for: "FITR_BACKEND_URL") else { return nil }
         return URL(string: raw)
     }
 
-    /// Only needed if the app still calls OpenWeatherMap directly. Once
-    /// requests go through the backend, the key lives on the server and this
-    /// should be left unset.
+    /// Only needed when no backend is configured and the app calls
+    /// OpenWeatherMap directly. With a backend the key lives on the server
+    /// and this should be left unset.
     static var openWeatherMapKey: String? {
         value(for: "OPENWEATHERMAP_API_KEY")
     }

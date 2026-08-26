@@ -48,8 +48,30 @@ class OutfitService {
             return
         }
         
+        if BackendService.shared.isConfigured {
+            generateOutfitWithBackend(vibe: vibe, weather: weather, completion: completion)
+            return
+        }
         generateOutfitWithAI(userId: userId, vibe: vibe, weather: weather, clothingItems: cleanItems) { result in
             completion(result)
+        }
+    }
+
+    /// CLIP shortlist plus Gemini ranking on the backend. The backend reads
+    /// the wardrobe from its own Postgres copy, so `clothingItems` is only
+    /// used for the emptiness checks above.
+    private func generateOutfitWithBackend(vibe: String, weather: Weather, completion: @escaping (Result<Outfit, Error>) -> Void) {
+        BackendService.shared.recommendOutfits(vibe: vibe, weather: weather) { result in
+            switch result {
+            case .success(let recommendation):
+                if let outfit = recommendation.asOutfit() {
+                    completion(.success(outfit))
+                } else {
+                    completion(.failure(NSError(domain: "OutfitService", code: 5, userInfo: [NSLocalizedDescriptionKey: "No suitable outfit could be created with current wardrobe"])))
+                }
+            case .failure(let error):
+                completion(.failure(error))
+            }
         }
     }
     private func generateOutfitWithAI(userId: String, vibe: String, weather: Weather, clothingItems: [ClothingItem], completion: @escaping (Result<Outfit, Error>) -> Void) {
@@ -69,7 +91,6 @@ class OutfitService {
                     
                     let decoder = JSONDecoder()
                     let aiResponse = try decoder.decode(OutfitAIResponse.self, from: jsonData)
-                    print("AI RES", aiResponse)
                     if aiResponse.selectedItemIds.isEmpty {
                         throw NSError(domain: "OutfitService", code: 5, userInfo: [NSLocalizedDescriptionKey: "No suitable outfit could be created with current wardrobe"])
                     }

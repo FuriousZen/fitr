@@ -11,6 +11,8 @@ import pytest
 
 from app.api.metrics import _percentile
 
+from .conftest import make_image
+
 COLD_RAIN = {
     "temperature": 42.0,
     "condition": "Rainy",
@@ -103,15 +105,64 @@ def test_top_k_narrows_the_numerator(client, auth, wardrobe):
     assert top1["top_k_acceptance"] < top3["top_k_acceptance"]
 
 
-def test_distinct_users_are_counted(client, auth, other_auth, make_item, wardrobe):
+def _seed_other_user(client, other_auth, upload):
+    """A second user with a wardrobe wide enough for a recommendation."""
+    for name, type_ in (("tee", "T-Shirt"), ("jeans", "Jeans"), ("boots", "Shoes")):
+        resp = client.post(
+            "/api/v1/wardrobe/items",
+            data=upload(make_image(label=f"other-{name}"), name=name, type=type_, color="black"),
+            headers=other_auth,
+            content_type="multipart/form-data",
+        )
+        assert resp.status_code == 201, resp.get_json()
+
+
+def test_acceptance_only_counts_the_callers_feedback(
+    client, auth, other_auth, upload, wardrobe
+):
+    _seed_other_user(client, other_auth, upload)
+
+    # The other user accepts twice; the caller rejects once.
+    for _ in range(2):
+        rec = _recommend(client, other_auth)
+        client.post(
+            f"/api/v1/recommendations/{rec['id']}/feedback",
+            json={"accepted": True, "accepted_rank": 1},
+            headers=other_auth,
+        )
     rec = _recommend(client, auth)
     client.post(
         f"/api/v1/recommendations/{rec['id']}/feedback",
-        json={"accepted": True, "accepted_rank": 1},
+        json={"accepted": False},
         headers=auth,
     )
-    body = client.get("/api/v1/metrics/acceptance", headers=auth).get_json()
-    assert body["distinct_users_with_feedback"] == 1
+
+    mine = client.get("/api/v1/metrics/acceptance", headers=auth).get_json()
+    assert mine["total_recommendations"] == 1
+    assert mine["recommendations_with_feedback"] == 1
+    assert mine["accepted_within_top_k"] == 0
+    assert mine["top_k_acceptance"] == 0.0
+
+    theirs = client.get("/api/v1/metrics/acceptance", headers=other_auth).get_json()
+    assert theirs["total_recommendations"] == 2
+    assert theirs["recommendations_with_feedback"] == 2
+    assert theirs["top_k_acceptance"] == 1.0
+
+    assert "distinct_users_with_feedback" not in mine
+
+
+def test_latency_only_covers_the_callers_recommendations(
+    client, auth, other_auth, upload, wardrobe
+):
+    _seed_other_user(client, other_auth, upload)
+    for _ in range(3):
+        _recommend(client, other_auth)
+    _recommend(client, auth)
+
+    assert client.get("/api/v1/metrics/latency", headers=auth).get_json()["samples"] == 1
+    assert (
+        client.get("/api/v1/metrics/latency", headers=other_auth).get_json()["samples"] == 3
+    )
 
 
 def test_latency_is_null_with_no_data(client, auth):

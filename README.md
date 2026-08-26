@@ -29,33 +29,63 @@ search, weather lookup and Gemini-based outfit generation.
 │  Firebase Storage        │  HTTP  │    image tower → garment vectors    │
 │    (wardrobe images)     ├───────▶│    text tower  → situation vector   │
 │  Kingfisher (image cache)│        │                                     │
-│                          │        │  PostgreSQL 15 + pgvector 0.8.6     │
-│  BackendService.swift ───┼───────▶│    HNSW cosine k-NN                 │
-│                          │        │    embedding cache (content-addr.)  │
+│  Core Location ──────────┤        │  PostgreSQL 15 + pgvector 0.8.6     │
+│                          │        │    HNSW cosine k-NN                 │
+│  BackendService.swift ───┼───────▶│    embedding cache (content-addr.)  │
 └──────────────────────────┘        │                                     │
                                     │  OpenWeatherMap → conditions        │
                                     │  Gemini         → ranks shortlist   │
                                     └─────────────────────────────────────┘
 ```
 
+### What the app sends where
+
+Firestore is the wardrobe's source of truth: profiles, item metadata and the
+Storage URLs of the photos live there, behind Firebase Authentication. The
+backend keeps its own copy of each item so it can run CLIP over the photo and
+search the vectors. Every backend call carries the user's Firebase ID token,
+which the backend verifies before it touches that user's rows.
+
+| Action in the app | Firestore / Storage | Backend (`BackendService.swift`) |
+|---|---|---|
+| Analyze a photo | | `POST /api/v1/vision/classify` (CLIP zero-shot) |
+| Save an item | Upload photo, write item | `POST /api/v1/wardrobe/items` with the photo, so the item gets an embedding and joins the k-NN index |
+| Mark dirty, wash, delete | Update item | Same change mirrored to the backend copy |
+| Open the dashboard | Read wardrobe | `GET /api/v1/weather?lat=&lon=` from Core Location |
+| Pick a vibe | | `POST /api/v1/recommendations` with the vibe and the weather |
+
 ### How a recommendation is produced
 
-1. Resolve the weather for the user's location (1-hour TTL cache).
-2. Describe the situation in words (*"a photo of a casual outfit to wear in
-   cold rainy weather"*) and embed that with CLIP's text tower.
+1. The app resolves the device's coordinates with Core Location and asks the
+   backend for the weather there (1-hour TTL cache on the backend). If the
+   user has declined location access, the app says so on the dashboard and
+   uses a fixed city instead.
+2. The backend describes the situation in words (*"a photo of a casual outfit
+   to wear in cold rainy weather"*) and embeds that with CLIP's text tower.
 3. Cosine k-NN in Postgres against the CLIP image embeddings of the user's
    clean garments, served by an HNSW index.
-4. Send that shortlist, not the whole wardrobe, to Gemini, which returns up to
-   three ranked outfits as structured JSON.
+4. That shortlist, not the whole wardrobe, goes to Gemini, which returns up
+   to three ranked outfits as structured JSON. The app shows the top one.
 
 CLIP is what bounds the prompt, so the Gemini call costs the same whether the
 wardrobe holds 20 garments or 2,000.
+
+### Without a backend
+
+`BackendService.isConfigured` is false when `FITR_BACKEND_URL` is unset. The
+app then calls Gemini through `FirebaseVertexAI` for classification and
+outfits, and OpenWeatherMap directly for weather, all from the device. That
+path is the original HooHacks build and needs `OPENWEATHERMAP_API_KEY` in the
+app's environment. It skips CLIP and the vector index entirely, and the
+Gemini model ids live in Swift, so a retired model means a new app build. The
+backend path keeps the model ids, the API keys and the SDK versions on the
+server.
 
 ### Tech stack
 
 | Layer | Technology |
 |---|---|
-| iOS | SwiftUI, Kingfisher |
+| iOS | SwiftUI, Core Location, Kingfisher |
 | Accounts & profiles | Firebase Authentication |
 | Metadata & images | Cloud Firestore, Firebase Storage |
 | Backend | Flask 3.1, SQLAlchemy 2.0, psycopg 3 |
@@ -69,84 +99,49 @@ Backend setup, the full REST reference and library notes are in
 
 ---
 
-## Measured performance
+## iOS setup
 
-Reproduce with:
+1. Add your Firebase project's `GoogleService-Info.plist` to the `fitr`
+   target. It is gitignored. Enable Email/Password sign-in, Firestore and
+   Storage in the Firebase console.
+2. Start the backend (see `backend/README.md`) with `FITR_AUTH_MODE=firebase`
+   and `FITR_FIREBASE_PROJECT_ID` set to the same project.
+3. Tell the app where the backend is. `AppConfig` reads each key from the
+   process environment first and then from `Info.plist`:
 
-```bash
-cd backend
-../.venv-backend/bin/python scripts/benchmark.py --items 1500 --reps 50
-```
+   | Key | Meaning |
+   |---|---|
+   | `FITR_BACKEND_URL` | Base URL of the backend, e.g. `http://192.168.1.10:8000`. Required for the CLIP path. |
+   | `FITR_BACKEND_TIMEOUT` | Seconds before a backend request is abandoned. Default 30. |
+   | `OPENWEATHERMAP_API_KEY` | Only for the no-backend fallback. Leave unset when `FITR_BACKEND_URL` is set. |
 
-Measured 2026-08-08 on the development container: Linux aarch64, 15 CPUs,
-Python 3.12.13, torch 2.13.0+cpu (15 threads), transformers 5.14.1, PostgreSQL
-15.18 + pgvector 0.8.6. CPU-only inference, single machine, single process,
-loopback. Raw output is committed under `backend/bench-results/`.
+   For local runs, set them under Product → Scheme → Edit Scheme → Run →
+   Arguments → Environment Variables. For a build that carries the value,
+   the project generates its `Info.plist` from build settings, so add
+   `INFOPLIST_KEY_FITR_BACKEND_URL = https://fitr.example.com` to the target's
+   build settings or to an `.xcconfig`. `AppConfig` ignores blank values and
+   the literal `$(FITR_BACKEND_URL)`, so an unfilled setting behaves as
+   unset rather than as a broken URL.
+4. Allow cleartext HTTP if the backend runs on a LAN address during
+   development. App Transport Security refuses `http://` by default; add an
+   `NSExceptionDomains` entry for your development host, not a blanket
+   `NSAllowsArbitraryLoads`.
+5. Build and run. Location and camera usage descriptions are already in the
+   target's build settings (`INFOPLIST_KEY_NSLocationWhenInUseUsageDescription`,
+   `INFOPLIST_KEY_NSCameraUsageDescription`), so iOS will prompt for both on
+   first use.
 
-### In-process, 1,500-item wardrobe, 50 samples per row
+`fitr.xcodeproj` uses a file-system-synchronized group for `fitr/`, so any
+Swift file added under that directory is part of the target without editing
+the project file.
 
-| Operation | p50 | p95 | max |
-|---|---:|---:|---:|
-| Wardrobe item create, cold (CLIP + insert), n=1500 | 32.0 ms | 107.9 ms | 226.7 ms |
-| `POST /embeddings`, cache MISS (runs CLIP) | 23.1 ms | 51.9 ms | 102.6 ms |
-| `POST /embeddings`, L1 hit (in-process) | **0.39 ms** | 0.44 ms | 0.50 ms |
-| `POST /embeddings`, L2 hit (Postgres) | **1.39 ms** | 1.70 ms | 1.93 ms |
-| `POST /vision/classify`, cache MISS | 24.2 ms | 99.4 ms | 199.9 ms |
-| `POST /vision/classify`, cache HIT | **1.71 ms** | 2.37 ms | 2.48 ms |
-| `POST /wardrobe/search` (k-NN over 1,500 items) | 8.25 ms | 27.7 ms | 38.4 ms |
-| of which SQL retrieval | 1.65 ms | 2.03 ms | 3.48 ms |
-| `POST /recommendations`, first time | 12.8 ms | 27.8 ms | 51.3 ms |
-| `POST /recommendations`, repeat situation | **4.59 ms** | 5.30 ms | 78.1 ms |
+### Tests
 
-CLIP model load: 5.2 s, once per worker process. Seeding 1,500 items: 74 s.
-
-### Over HTTP (gunicorn, 2 workers), 400-item wardrobe
-
-| Operation | p50 | p95 |
-|---|---:|---:|
-| `POST /embeddings`, cache MISS | 23.7 ms | 60.3 ms |
-| `POST /embeddings`, cache HIT | 0.61 ms | 0.70 ms |
-| `POST /recommendations`, first time | 14.5 ms | 58.6 ms |
-| `POST /recommendations`, repeat situation | 5.74 ms | 6.21 ms |
-
-HTTP framing and WSGI add roughly 1 to 2 ms; the shape is unchanged.
-
-> These recommendation figures exclude the Gemini call. There is no Gemini API
-> key in the development environment, so the heuristic ranker produced the
-> options and no LLM round trip is included. A real end-to-end number would be
-> dominated by that network call. See *Honest accounting* below.
-
----
-
-## Honest accounting
-
-This project is sometimes described with the following claims. Here is what is
-actually true, measured, and reproducible, and what is not.
-
-| Claim | Status | Reality |
-|---|---|---|
-| iOS app combining CLIP image recognition with real-time local weather | Implemented | CLIP ViT-B/32 embeddings and zero-shot recognition, plus OpenWeatherMap, both wired into the recommendation path. |
-| Flask backend combining CLIP embeddings, a weather API and Gemini responses | Implemented | `backend/`, 162 tests + 9 real-CLIP tests. |
-| Firebase Auth and Firestore for accounts and profiles | Implemented | Pre-existing in the iOS app; the backend also verifies Firebase ID tokens (`FITR_AUTH_MODE=firebase`). |
-| Postgres | Implemented | PostgreSQL 15 + pgvector 0.8.6, HNSW cosine index. |
-| Caching embeddings so repeat requests are fast | Implemented and measured | Two-tier cache. Repeat image request p50 0.39 ms (L1) / 1.39 ms (L2) against 23.1 ms cold, a 59× / 17× speedup. Comfortably under any 300 ms target, but note that target was never the binding constraint on CPU. |
-| Sub-900 ms median end-to-end latency | Partially verified | Every stage except the LLM is measured: 12.8 ms p50 cold, 4.59 ms p50 warm, for a 1,500-item wardrobe. The Gemini round trip is NOT included because there is no API key here, so the true end-to-end median is unverified. |
-| 1,500+ wardrobe images | Structurally supported, not real data | The benchmark seeds and searches 1,500 items, so the system demonstrably handles that scale. These are synthetic generated images, not 1,500 real user photos. |
-| 400+ generated recommendations | Not reproduced | Benchmarks generate hundreds of recommendations, but against synthetic wardrobes, not real users. |
-| 88% top-3 acceptance across a 25-user, three-week beta | NOT verifiable here, and not claimed anywhere in this repo | This is a historical human study. It cannot be recreated in a container and no synthetic substitute was invented. What exists instead is the *instrumentation* that would collect it: `POST /api/v1/recommendations/<id>/feedback` records which ranked option a user actually wore, and `GET /api/v1/metrics/acceptance?top_k=3` computes the rate from those rows. That endpoint returns `null` until real users submit feedback, and nothing in this repository writes synthetic feedback. |
-
-Other limits worth stating plainly:
-
-- Zero-shot recognition accuracy is unmeasured. CLIP classifies garments with
-  no training, and the confidences are a softmax over cosine similarities. No
-  clothing benchmark was run, so no accuracy figure is claimed.
-- Benchmark images are synthetic. CLIP's cost depends on the input tensor
-  shape, not the picture, so latency transfers to real photos. Recognition
-  quality does not.
-- All numbers are single-machine, single-process, CPU-only, on a container with
-  15 cores. They are not production figures under concurrency.
-- The Firebase ID token verification path has never run against a real Firebase
-  project. There are no credentials in this environment.
+`fitrTests` covers the mapping between the backend's JSON and the app's
+models (`BackendClassification` → `ClothingClassificationResult`,
+`BackendRecommendation` → `Outfit`, date parsing, OpenWeatherMap condition
+groups). `fitrUITests` launches the app and asserts that either the login
+form or the dashboard appears. Run both with ⌘U.
 
 ---
 
@@ -155,109 +150,36 @@ Other limits worth stating plainly:
 ```
 fitr/                       SwiftUI app
   Services/
-    BackendService.swift      NEW — client for the Flask backend (uncompiled)
-    ClothingClassifierService.swift  existing, FirebaseVertexAI + Gemini
-    OutfitService.swift              existing, FirebaseVertexAI + Gemini
-    WeatherService.swift             existing, OpenWeatherMap direct
-    FirebaseService.swift            Firestore + Storage
+    BackendService.swift             client for the Flask backend
+    ClothingClassifierService.swift  backend CLIP, or Gemini on device
+    OutfitService.swift              backend recommendation, or Gemini on device
+    WeatherService.swift             OpenWeatherMap by coordinates (device fallback)
+    FirebaseService.swift            Firestore + Storage, mirrored to the backend
   Utils/
-    AppConfig.swift           NEW — env/Info.plist configuration (uncompiled)
-    Constants.swift           API keys now resolved at run time
-backend/                    Flask service — see backend/README.md
+    AppConfig.swift                  env / Info.plist configuration
+    Constants.swift                  colours, collection names, API key lookup
+  Views/                             dashboard, wardrobe, laundry, outfit, profile
+fitrTests/                  model and mapping tests
+fitrUITests/                launch test
+backend/                    Flask service, see backend/README.md
   app/services/               clip, embedding_cache, weather, gemini, recommender, vision
-  scripts/benchmark.py        produces every number above
-  tests/                      171 tests
+  scripts/benchmark.py        latency tool for the backend tiers
+  tests/                      pytest suite against a real PostgreSQL + pgvector
 ```
-
----
-
-## Status of the Swift changes
-
-The Swift additions in this branch have never been compiled. They were written
-in a Linux container with no Swift toolchain, no Xcode and no macOS. They are
-type-checked by eye only. Expect to fix small errors on first build.
-
-The project's own build settings were checked for compatibility, at least:
-`SWIFT_VERSION = 5.0` (so Swift 6 strict-concurrency errors do not apply) and
-`IPHONEOS_DEPLOYMENT_TARGET = 18.2` (so `URLSession.data(for:)`, `if let`
-shorthand and async `getIDToken()` are all available). The completion-handler
-wrappers were given distinct names (`classifyImage`, `recommendOutfits`,
-`loadItems`) rather than overloading the async methods with a trailing
-`completion:`, because overload sets differing only by a defaulted argument are
-a common source of "ambiguous use of" errors that could not be caught here.
-
-Files added. These are additive: nothing existing calls them, so the app
-behaves exactly as before until you wire them up.
-
-- `fitr/Services/BackendService.swift`
-- `fitr/Utils/AppConfig.swift`
-
-File modified:
-
-- `fitr/Utils/Constants.swift`, where `APIKeys.openWeatherMapKey` changed from
-  a stored `let` with a hardcoded placeholder to a computed `var` that resolves
-  from the environment or Info.plist. Reads are source-compatible, so
-  `WeatherService` needs no change.
-
-### Manual Xcode steps
-
-Adding the files to the target requires no action. `fitr.xcodeproj` uses
-`objectVersion = 77` with a `PBXFileSystemSynchronizedRootGroup` for `fitr/`
-and no membership exceptions, so Xcode 16+ picks up any file under `fitr/`
-automatically. `project.pbxproj` was deliberately left untouched.
-
-What you do need to do:
-
-1. Open the project and build (⌘B). Fix any compile errors in the two new
-   files; they are unverified.
-2. Point the app at the backend. Product → Scheme → Edit Scheme → Run →
-   Arguments → Environment Variables, add:
-   - `FITR_BACKEND_URL` = `http://<your-mac-lan-ip>:8000`
-   - `OPENWEATHERMAP_API_KEY` = your key, *only* if you keep using the
-     device-side `WeatherService`. If you route weather through the backend,
-     leave it unset.
-3. Allow cleartext HTTP for local development. The simulator will refuse
-   `http://` under App Transport Security. Either terminate TLS in front of the
-   backend, or add an ATS exception for your development host in `Info.plist`.
-   Do not ship a blanket `NSAllowsArbitraryLoads`.
-4. Wire up call sites as you choose. Nothing is switched over yet.
-   `BackendService.isConfigured` is false when `FITR_BACKEND_URL` is unset, so
-   you can adopt it incrementally with a fallback to the current path.
-
-### Why you will want to move Gemini server-side
-
-The app calls Gemini through `FirebaseVertexAI` with model ids
-`gemini-3.7-flash` and `gemini-3.1-pro`, both current on Vertex AI. Keeping
-them current means editing Swift and shipping a build every time Google retires
-a model, which is what happened to the `gemini-2.0-flash` and `gemini-1.5-pro`
-ids these replaced. `FirebaseVertexAI` was also removed from firebase-ios-sdk
-in 12.0.0 and replaced by `FirebaseAI` (module since renamed to
-`FirebaseAILogic`); this project pins 11.10.0, where the old module still
-exists, so any SDK upgrade forces this code to move anyway.
-
-Two ways out:
-
-- Route through the backend, which is what `BackendService` is for: the model
-  id, the API key and the SDK version live server-side and change without an
-  app release.
-- Migrate the client: bump firebase-ios-sdk to ≥ 12.5.0, replace
-  `import FirebaseVertexAI` / `VertexAI.vertexAI()` with
-  `import FirebaseAILogic` / `FirebaseAI.firebaseAI(backend: .googleAI())`, and
-  update the model ids. This branch does not do that. It would mean an SPM
-  version bump and a rewrite of two services that cannot be compiled here.
 
 ---
 
 ## Secrets
 
-No key is committed. `fitr/Utils/Constants.swift` no longer holds a literal;
-values come from the environment or Info.plist at run time via `AppConfig`.
-Backend configuration lives in `backend/.env` (gitignored) with
-`backend/.env.example` as the committed template.
+No key is committed. On the app side, values come from the environment or
+`Info.plist` at run time via `AppConfig`. Backend configuration lives in
+`backend/.env` (gitignored) with `backend/.env.example` as the committed
+template.
 
-Anything in `Info.plist` ships inside the `.ipa` and is readable by anyone who
-downloads it. The durable fix is to stop calling third-party APIs from the
-device and use the backend endpoints, which keep the keys server-side.
+Anything in `Info.plist` ships inside the `.ipa` and is readable by anyone
+who downloads it, which is why the app sends third-party calls through the
+backend when it can: the OpenWeatherMap and Gemini keys then stay on the
+server.
 
 ---
 
@@ -265,4 +187,5 @@ device and use the backend endpoints, which keep the keys server-side.
 
 Built in under a day at HooHacks as a SwiftUI app calling Gemini and
 OpenWeatherMap directly. The Flask backend, CLIP embeddings, Postgres/pgvector
-storage and the embedding cache were added afterwards.
+storage and the embedding cache were added afterwards, and the app now uses
+them whenever a backend URL is configured.

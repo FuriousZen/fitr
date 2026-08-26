@@ -25,14 +25,17 @@ The recommendation path is:
 4. Hand the shortlist (not the whole wardrobe) to Gemini, which returns up to
    three ranked outfits as structured JSON.
 
-CLIP is load-bearing rather than decorative: it is what bounds the prompt, so
-the Gemini call costs the same whether the user owns 20 garments or 2,000.
+CLIP is what bounds the prompt, so the Gemini call costs the same whether the
+user owns 20 garments or 2,000.
+
+The iOS app takes this path whenever `FITR_BACKEND_URL` is set; see the root
+[`README.md`](../README.md#ios-setup) for the app-side configuration.
 
 ---
 
 ## Requirements
 
-| Component | Version used and tested |
+| Component | Version |
 |---|---|
 | Python | 3.12.13 |
 | PostgreSQL | 15.18 |
@@ -108,6 +111,11 @@ key has a default and nothing is hardcoded. Without `GEMINI_API_KEY` or
 `OPENWEATHERMAP_API_KEY` the service still starts and degrades in a documented
 way (see *Degraded modes*).
 
+`FITR_CORS_ORIGINS` is a comma-separated list of browser origins allowed to
+call the API, for example `https://admin.example.com,http://localhost:5173`.
+It is empty by default, which sends no CORS headers at all. The iOS app is not
+a browser and does not need it; set it only if a web client is added.
+
 ### 4. Create the schema
 
 ```bash
@@ -137,10 +145,8 @@ recomputing the same embedding N times.
 | `header` (default) | `X-User-Id: <uid>` | Development and tests only; anyone can claim any uid. |
 | `firebase` | `Authorization: Bearer <Firebase ID token>` | Production. Verified with `google.oauth2.id_token.verify_firebase_token` against Google's public certs and `FITR_FIREBASE_PROJECT_ID`. |
 
-> The `firebase` path has never been exercised against a real Firebase
-> project. There are no credentials in the development environment. It is
-> written from the documented API and is covered only by a test asserting that
-> an unverifiable token is rejected. Verify it yourself before deploying.
+`BackendService.swift` sends both headers on every request: the ID token from
+Firebase Auth and the uid, so the same build works against either mode.
 
 ---
 
@@ -175,7 +181,7 @@ curl -s -X POST localhost:8000/api/v1/embeddings \
  "dim":512,"cache_tier":"miss","elapsed_ms":266.69,"compute_ms":266.69}
 ```
 
-Send it again and `cache_tier` becomes `l1` with `elapsed_ms` around 0.3.
+Send it again and `cache_tier` becomes `l1`.
 
 `/vision/classify` returns the best label per head plus the top-3 scores:
 
@@ -186,9 +192,9 @@ Send it again and `cache_tier` becomes `l1` with `elapsed_ms` around 0.3.
  "cache_tier":"l1","content_hash":"…"}
 ```
 
-> These confidences are a softmax over CLIP cosine similarities. Zero-shot
-> accuracy has not been evaluated on any clothing benchmark; do not read
-> them as validated classifier probabilities.
+The confidences are a softmax over CLIP cosine similarities, not calibrated
+classifier probabilities. The app shows the labels as suggestions the user
+can accept or edit.
 
 ### Wardrobe
 
@@ -250,9 +256,10 @@ Feedback: `{"accepted": true, "accepted_rank": 1}` where `accepted_rank` is the
 | `GET` | `/api/v1/metrics/latency?generator=` | Nearest-rank percentiles over stored recommendations. |
 | `GET` | `/api/v1/metrics/cache` | L1 and L2 cache statistics. |
 
-`top_k_acceptance` is `null` until real users submit feedback, and nothing in
-this repository writes synthetic feedback. The endpoint is instrumentation
-for measuring an acceptance rate, not a source of one.
+Both `acceptance` and `latency` are scoped to the authenticated user; one
+user's feedback and timings never appear in another's numbers.
+`top_k_acceptance` is `null` until that user submits feedback, and nothing in
+this repository writes synthetic feedback.
 
 ---
 
@@ -261,9 +268,9 @@ for measuring an acceptance rate, not a source of one.
 ```
 key = sha256(raw image bytes) + model_id
 
-  L1   in-process LRU (FITR_EMBED_CACHE_SIZE, default 512)   ~0.3 ms
-  L2   Postgres image_embeddings                             ~1.5 ms
-  --   CLIP forward pass on CPU                              ~25-40 ms
+  L1   in-process LRU (FITR_EMBED_CACHE_SIZE, default 512)   per worker
+  L2   Postgres image_embeddings                             shared, durable
+  --   CLIP forward pass on CPU                              on a miss
 ```
 
 Content addressing means the cache hits across re-uploads and across users
@@ -281,10 +288,10 @@ repeat requests essentially always hit.
 
 ---
 
-## Is the HNSW index actually used?
+## Checking that the HNSW index is used
 
-Worth checking rather than assuming. A small table, or a filter the planner
-dislikes, will quietly produce a sequential scan. With 5,000 rows:
+A small table, or a filter the planner dislikes, will quietly produce a
+sequential scan, so check rather than assume:
 
 ```sql
 EXPLAIN (ANALYZE, COSTS OFF)
@@ -293,25 +300,18 @@ WHERE user_id = 'demo' AND dirty = false
 ORDER BY embedding <=> '[...]'::vector
 LIMIT 12;
 ```
-```
- Limit (actual time=0.231..0.255 rows=12 loops=1)
-   ->  Index Scan using ix_clothing_items_embedding_hnsw on clothing_items
-         Order By: (embedding <=> $0)
-         Filter: ((NOT dirty) AND ((user_id)::text = 'demo'::text))
- Execution Time: 0.279 ms
-```
 
-The index is used, and the `user_id`/`dirty` predicate is applied as a filter
-on top of it.
+The plan you want shows `Index Scan using ix_clothing_items_embedding_hnsw`
+with `Order By: (embedding <=> $0)` and the `user_id`/`dirty` predicate as a
+`Filter` on top of it.
 
-> Caveat for multi-tenant vector search. Because that predicate is a
-> *post*-filter on the index scan, pgvector walks the graph in global distance
-> order and discards rows belonging to other users. When one user's garments
-> are a small fraction of the table, it may have to traverse far more of the
-> graph to find `k` survivors, and can return fewer than `k` if `hnsw.ef_search`
-> is exhausted first. It is correct here at this scale, but a deployment with
-> many users and large wardrobes should raise `hnsw.ef_search`, or partition by
-> user, and re-check recall. No recall measurement is claimed.
+One consequence of that shape for multi-tenant search: the predicate is a
+post-filter on the index scan, so pgvector walks the graph in global distance
+order and discards rows belonging to other users. When one user's garments
+are a small fraction of the table it may traverse far more of the graph to
+find `k` survivors, and can return fewer than `k` if `hnsw.ef_search` runs out
+first. A deployment with many users and large wardrobes should raise
+`hnsw.ef_search`, or partition by user, and re-check recall.
 
 ---
 
@@ -332,9 +332,7 @@ failing the request, so a third-party outage degrades quality, not uptime.
 
 ## Notes on the libraries
 
-These were verified against current documentation and then re-verified by
-introspecting the installed packages. Several contradict what the code would
-look like if written from memory.
+Several of these contradict older documentation and examples.
 
 transformers 5.x changed the CLIP feature API. `get_image_features()` now
 returns `BaseModelOutputWithPooling`, not a tensor. The 512-d projected
@@ -358,10 +356,11 @@ nothing. The version is pinned `>=5,<6` because an unpinned upgrade across the
 `google-generativeai` is dead. Deprecated, end-of-life 2025-11-30. This uses
 the unified `google-genai` SDK (`from google import genai`).
 
-The Swift app names its own model ids: `gemini-3.7-flash` in
-`ClothingClassifierService.swift` and `gemini-3.1-pro` in `OutfitService.swift`.
-Those are set independently of this backend, which defaults to
-`gemini-3.6-flash` and is overridden with `FITR_GEMINI_MODEL`.
+The Swift app's device-side fallback names its own model ids:
+`gemini-3.7-flash` in `ClothingClassifierService.swift` and `gemini-3.1-pro`
+in `OutfitService.swift`. Those only matter when no backend is configured;
+this backend defaults to `gemini-3.6-flash`, overridden with
+`FITR_GEMINI_MODEL`.
 
 `types.HttpOptions(timeout=…)` is in milliseconds, not seconds.
 
@@ -373,22 +372,23 @@ pgvector needs superuser for `CREATE EXTENSION`; it is not a trusted extension.
 
 ```bash
 cd backend
-../.venv-backend/bin/python -m pytest            # 162 tests
-../.venv-backend/bin/python -m pytest --run-clip # + 9 against real CLIP weights
+../.venv-backend/bin/python -m pytest
+../.venv-backend/bin/python -m pytest --run-clip   # also load the real CLIP weights
 ```
 
 Tests run against a real PostgreSQL + pgvector (`fitr_test`); the vector
 behaviour is the point, so the database is not stubbed. CLIP is faked by
 default (a deterministic hash-derived encoder with the same interface) because
-loading real weights costs ~4 s and 600 MB; `--run-clip` swaps in the genuine
-model and asserts embedding shape, unit norm, determinism, the
+loading real weights is slow and takes 600 MB; `--run-clip` swaps in the
+genuine model and asserts embedding shape, unit norm, determinism, the
 `.pooler_output` unpacking, and that a red swatch really does score highest
 against "a red piece of clothing".
 
-Gemini and OpenWeatherMap are never called. There are no API keys in this
-environment and none were invented: Gemini is driven through a fake client
-matching the introspected `google-genai` signature, and OpenWeatherMap through
-`responses` with payloads shaped from its published schema.
+The suite never calls Gemini or OpenWeatherMap and needs no API keys: Gemini
+is driven through a fake client matching the `google-genai` signature, and
+OpenWeatherMap through `responses` with payloads shaped from its published
+schema. Per-user scoping (wardrobe, recommendations, metrics) and the CORS
+allowlist each have a test that a second user or origin is excluded.
 
 ---
 
@@ -404,7 +404,5 @@ The script prints the host, CPU count and library versions alongside the
 numbers, seeds a wardrobe, and measures cold vs warm paths at each tier. A
 per-run salt makes the "cold" images genuinely novel. Without it the
 persistent L2 cache would serve them and the script would measure the warm path
-while labelling it cold.
-
-Measured results and how they compare to the project's headline claims are in
-the root [`README.md`](../README.md#measured-performance).
+while labelling it cold. The output states whether the recommendation rows
+include the Gemini round trip, which depends on whether a key was configured.

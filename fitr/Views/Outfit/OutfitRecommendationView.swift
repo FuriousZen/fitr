@@ -273,7 +273,6 @@ struct OutfitRecommendationView: View {
     }
     
     private func loadOutfitRecommendation() {
-        print("loading new outfit")
         isLoading = true
         errorMessage = nil
         

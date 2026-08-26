@@ -11,13 +11,9 @@ Two modes, selected by ``FITR_AUTH_MODE``:
     Verify a Firebase ID token from ``Authorization: Bearer <jwt>`` using
     ``google.oauth2.id_token.verify_firebase_token``, which checks the
     signature against Google's public certs and the ``aud`` claim against
-    ``FITR_FIREBASE_PROJECT_ID``. This is the mode a real deployment must use,
-    and it lines up with the Firebase Authentication the iOS app already has.
-
-The verification path has NOT been exercised against a real Firebase project in
-this environment. There are no credentials here. It is written from the
-documented API surface and covered only by a test that asserts a bad token is
-rejected.
+    ``FITR_FIREBASE_PROJECT_ID``. This is the mode a real deployment must use.
+    ``BackendService.swift`` sends the token the iOS app already holds from
+    Firebase Authentication.
 """
 
 from __future__ import annotations

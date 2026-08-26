@@ -10,17 +10,26 @@ import XCTest
 final class fitrUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
     }
 
-    override func tearDownWithError() throws {
-    }
-
+    /// The app opens on either the login form or, when a session is still
+    /// cached on the simulator, the dashboard's tab bar. One of the two must
+    /// be present; a blank screen or a crash on launch fails here.
     @MainActor
-    func testExample() throws {
+    func testLaunchShowsLoginOrDashboard() throws {
         let app = XCUIApplication()
         app.launch()
+
+        let emailField = app.textFields["Email"]
+        let homeTab = app.tabBars.buttons["Home"]
+        let reachedAScreen = emailField.waitForExistence(timeout: 15) || homeTab.waitForExistence(timeout: 5)
+
+        XCTAssertTrue(reachedAScreen, "expected the login form or the dashboard after launch")
+        if emailField.exists {
+            XCTAssertTrue(app.staticTexts["fitr"].exists)
+            XCTAssertTrue(app.buttons["Login"].exists)
+        }
     }
 
     @MainActor

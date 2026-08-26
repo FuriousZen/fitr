@@ -65,6 +65,8 @@ class AuthenticationManager: ObservableObject {
                     default:
                         self.error = error
                     }
+                } else {
+                    self.error = error
                 }
                 return
             }
@@ -118,6 +120,38 @@ class AuthenticationManager: ObservableObject {
         }
     }
     
+    /// Rename the signed-in user. Writes the profile document, then updates
+    /// `currentUser` so the dashboard greeting and profile screen follow.
+    func updateProfile(name: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard var user = currentUser else {
+            completion(.failure(NSError(domain: "app.fitr", code: 1, userInfo: [NSLocalizedDescriptionKey: "Not signed in"])))
+            return
+        }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            completion(.failure(NSError(domain: "app.fitr", code: 2, userInfo: [NSLocalizedDescriptionKey: "Name cannot be empty"])))
+            return
+        }
+        user.name = trimmed
+        
+        do {
+            try Firestore.firestore().collection(FirebaseCollections.users).document(user.id).setData(from: user, merge: true) { error in
+                DispatchQueue.main.async {
+                    if let error = error {
+                        self.error = error
+                        completion(.failure(error))
+                    } else {
+                        self.currentUser = user
+                        completion(.success(()))
+                    }
+                }
+            }
+        } catch {
+            self.error = error
+            completion(.failure(error))
+        }
+    }
+    
     private func saveUserToFirestore(user: User) {
         let db = Firestore.firestore()
         
@@ -143,7 +177,6 @@ class AuthenticationManager: ObservableObject {
             if let document = document, document.exists {
                 do {
                     self.currentUser = try document.data(as: User.self)
-                    print("fetched user data successful!", self.currentUser)
                     completion(true)
                 } catch {
                     self.error = error

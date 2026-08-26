@@ -29,7 +29,19 @@ class ClothingClassifier {
         )
     }
     
+    /// CLIP zero-shot classification through the backend when one is
+    /// configured; Gemini on the device otherwise.
     func classifyClothing(_ image: UIImage, completion: @escaping (Result<ClothingClassificationResult, Error>) -> Void) {
+        if BackendService.shared.isConfigured {
+            BackendService.shared.classifyImage(image) { result in
+                completion(result.map { $0.asClassificationResult() })
+            }
+            return
+        }
+        classifyWithGemini(image, completion: completion)
+    }
+
+    private func classifyWithGemini(_ image: UIImage, completion: @escaping (Result<ClothingClassificationResult, Error>) -> Void) {
         Task {
             do {
                 guard let model = generativeModel else {

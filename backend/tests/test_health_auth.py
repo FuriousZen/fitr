@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import pytest
 
+from app import create_test_app
+from app.config import _env_list
+
 
 def test_healthz_reports_live_database_and_pgvector(client):
     resp = client.get("/healthz")
@@ -49,8 +52,7 @@ def test_overlong_user_id_rejected(client):
 
 
 def test_firebase_mode_rejects_a_garbage_token(app, client):
-    """The firebase path has never been run against a real project here; this
-    only asserts that an unverifiable token is refused rather than trusted."""
+    """An unverifiable token must be refused rather than trusted."""
     app.config["AUTH_MODE"] = "firebase"
     app.config["FIREBASE_PROJECT_ID"] = "fitr-test-project"
     try:
@@ -80,3 +82,37 @@ def test_unknown_route_returns_json_error(client):
     resp = client.get("/api/v1/nope")
     assert resp.status_code == 404
     assert "error" in resp.get_json()
+
+
+def test_cors_is_off_by_default(client):
+    resp = client.get("/healthz", headers={"Origin": "https://evil.example"})
+    assert resp.status_code == 200
+    assert "Access-Control-Allow-Origin" not in resp.headers
+
+
+def test_cors_allows_only_the_configured_origins():
+    app = create_test_app(CORS_ORIGINS=["https://a.example", "https://b.example"])
+    client = app.test_client()
+
+    allowed = client.get("/healthz", headers={"Origin": "https://b.example"})
+    assert allowed.headers["Access-Control-Allow-Origin"] == "https://b.example"
+
+    denied = client.get("/healthz", headers={"Origin": "https://c.example"})
+    assert "Access-Control-Allow-Origin" not in denied.headers
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        (None, []),
+        ("", []),
+        ("https://a.example", ["https://a.example"]),
+        (" https://a.example , https://b.example ,", ["https://a.example", "https://b.example"]),
+    ],
+)
+def test_cors_origins_are_split_on_commas(monkeypatch, raw, expected):
+    if raw is None:
+        monkeypatch.delenv("FITR_CORS_ORIGINS", raising=False)
+    else:
+        monkeypatch.setenv("FITR_CORS_ORIGINS", raw)
+    assert _env_list("FITR_CORS_ORIGINS") == expected

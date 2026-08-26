@@ -109,6 +109,23 @@ def test_peek_tier_does_not_mutate(app, services):
     assert services.cache.peek_tier(image) == L1
 
 
+def test_peek_tier_does_not_refresh_lru_position(app, services):
+    """Peeking must not count as a use, or a peeked entry would survive
+    eviction at the expense of one that was genuinely used more recently."""
+    services.cache.max_entries = 2
+    first, second, third = (make_image(label=f"peek-lru{i}") for i in range(3))
+    services.cache.get_or_compute(first)
+    services.cache.get_or_compute(second)
+
+    assert services.cache.peek_tier(first) == L1
+    services.cache.get_or_compute(third)
+
+    # `first` was the least recently *used* despite the peek, so it went.
+    assert services.cache.peek_tier(first) == L2
+    assert services.cache.peek_tier(second) == L1
+    assert services.cache.peek_tier(third) == L1
+
+
 def test_health_counts_hits_and_misses(app, services):
     image = make_image(label="stats")
     services.cache.get_or_compute(image)

@@ -11,6 +11,8 @@ import Kingfisher
 struct ProfileView: View {
     @EnvironmentObject var authManager: AuthenticationManager
     @State private var showingLogoutAlert = false
+    @State private var showingEditProfile = false
+    @State private var showingAbout = false
     
     var body: some View {
         NavigationView {
@@ -52,12 +54,7 @@ struct ProfileView: View {
                         SettingsSectionHeader(title: "Account")
                         
                         SettingsItem(icon: "person.fill", title: "Edit Profile") {
-                        }
-                        
-                        SettingsItem(icon: "bell.fill", title: "Notifications") {
-                        }
-                        
-                        SettingsItem(icon: "lock.fill", title: "Privacy") {
+                            showingEditProfile = true
                         }
                     }
                     .padding(.horizontal)
@@ -65,13 +62,8 @@ struct ProfileView: View {
                     VStack(spacing: 5) {
                         SettingsSectionHeader(title: "App")
                         
-                        SettingsItem(icon: "gear", title: "Preferences") {
-                        }
-                        
-                        SettingsItem(icon: "questionmark.circle.fill", title: "Help & Support") {
-                        }
-                        
                         SettingsItem(icon: "info.circle.fill", title: "About") {
+                            showingAbout = true
                         }
                     }
                     .padding(.horizontal)
@@ -109,6 +101,91 @@ struct ProfileView: View {
             }
             .background(AppColors.moonMist.opacity(0.1).ignoresSafeArea())
             .navigationTitle("Profile")
+            .sheet(isPresented: $showingEditProfile) {
+                EditProfileView()
+                    .environmentObject(authManager)
+            }
+            .alert("About fitr", isPresented: $showingAbout) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(aboutText)
+            }
+        }
+    }
+    
+    private var aboutText: String {
+        let info = Bundle.main.infoDictionary
+        let version = info?["CFBundleShortVersionString"] as? String ?? "1"
+        let build = info?["CFBundleVersion"] as? String ?? "1"
+        let source = BackendService.shared.isConfigured
+            ? "Recommendations come from the fitr backend (CLIP + Gemini)."
+            : "Recommendations come from Gemini on this device."
+        return "Version \(version) (\(build)).\n\(source)"
+    }
+}
+
+/// Edits the fields the profile document actually holds. The email is shown
+/// but not editable here, since changing it means re-verifying with Firebase
+/// Auth as well as rewriting the profile.
+struct EditProfileView: View {
+    @EnvironmentObject var authManager: AuthenticationManager
+    @Environment(\.presentationMode) var presentationMode
+    @State private var name = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+    
+    private var trimmedName: String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Name")) {
+                    TextField("Name", text: $name)
+                        .disabled(isSaving)
+                }
+                
+                Section(header: Text("Email")) {
+                    Text(authManager.currentUser?.email ?? "")
+                        .foregroundColor(.secondary)
+                }
+                
+                if let errorMessage = errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                }
+            }
+            .navigationTitle("Edit Profile")
+            .navigationBarItems(
+                leading: Button("Cancel") {
+                    presentationMode.wrappedValue.dismiss()
+                },
+                trailing: Button(isSaving ? "Saving..." : "Save") {
+                    save()
+                }
+                .disabled(isSaving || trimmedName.isEmpty || trimmedName == authManager.currentUser?.name)
+            )
+            .onAppear {
+                name = authManager.currentUser?.name ?? ""
+            }
+        }
+    }
+    
+    private func save() {
+        isSaving = true
+        errorMessage = nil
+        authManager.updateProfile(name: trimmedName) { result in
+            isSaving = false
+            switch result {
+            case .success:
+                presentationMode.wrappedValue.dismiss()
+            case .failure(let error):
+                errorMessage = error.localizedDescription
+            }
         }
     }
 }

@@ -10,7 +10,7 @@ from __future__ import annotations
 from flask import Blueprint, request
 from sqlalchemy import func, select
 
-from ..auth import require_user
+from ..auth import current_user_id, require_user
 from ..extensions import db
 from ..models import Recommendation, RecommendationFeedback
 from .helpers import get_int, get_str
@@ -31,33 +31,37 @@ def _percentile(values: list[float], pct: float) -> float | None:
 @bp.get("/acceptance")
 @require_user
 def acceptance():
-    """Top-k recommendation acceptance, computed from submitted feedback.
+    """Top-k recommendation acceptance over the caller's own feedback.
 
     top_k_acceptance = (feedback rows with accepted=true and accepted_rank<=k)
                        / (all feedback rows)
 
-    This is null until real users submit feedback. There is no seeded or
-    simulated feedback anywhere in this repository.
+    Scoped to the authenticated user: one user's feedback is never visible in
+    another user's numbers. This is null until the user submits feedback;
+    there is no seeded or simulated feedback anywhere in this repository.
     """
+    user_id = current_user_id()
     top_k = get_int(request.args.to_dict(flat=True), "top_k", 3, minimum=1, maximum=50)
 
     total_recommendations = db.session.execute(
-        select(func.count()).select_from(Recommendation)
+        select(func.count())
+        .select_from(Recommendation)
+        .where(Recommendation.user_id == user_id)
     ).scalar_one()
     with_feedback = db.session.execute(
-        select(func.count()).select_from(RecommendationFeedback)
+        select(func.count())
+        .select_from(RecommendationFeedback)
+        .where(RecommendationFeedback.user_id == user_id)
     ).scalar_one()
     accepted_in_top_k = db.session.execute(
         select(func.count())
         .select_from(RecommendationFeedback)
         .where(
+            RecommendationFeedback.user_id == user_id,
             RecommendationFeedback.accepted.is_(True),
             RecommendationFeedback.accepted_rank.isnot(None),
             RecommendationFeedback.accepted_rank <= top_k,
         )
-    ).scalar_one()
-    distinct_users = db.session.execute(
-        select(func.count(func.distinct(RecommendationFeedback.user_id)))
     ).scalar_one()
 
     rate = round(accepted_in_top_k / with_feedback, 4) if with_feedback else None
@@ -68,7 +72,6 @@ def acceptance():
         "recommendations_with_feedback": int(with_feedback),
         "accepted_within_top_k": int(accepted_in_top_k),
         "top_k_acceptance": rate,
-        "distinct_users_with_feedback": int(distinct_users),
         "note": (
             "null acceptance means no feedback has been submitted. This value is "
             "computed only from rows in recommendation_feedback."
@@ -81,23 +84,28 @@ def acceptance():
 @bp.get("/latency")
 @require_user
 def latency():
-    """Latency percentiles over stored recommendations.
+    """Latency percentiles over the caller's stored recommendations.
 
     Optional ``generator`` filter (``gemini`` / ``heuristic``) matters a great
     deal: the heuristic path makes no network call, so mixing the two produces
     a meaningless median.
     """
+    user_id = current_user_id()
     args = request.args.to_dict(flat=True)
     generator = get_str(args, "generator")
     limit = get_int(args, "limit", 1000, minimum=1, maximum=100_000)
 
-    stmt = select(
-        Recommendation.total_ms,
-        Recommendation.weather_ms,
-        Recommendation.clip_ms,
-        Recommendation.retrieval_ms,
-        Recommendation.generation_ms,
-    ).order_by(Recommendation.created_at.desc())
+    stmt = (
+        select(
+            Recommendation.total_ms,
+            Recommendation.weather_ms,
+            Recommendation.clip_ms,
+            Recommendation.retrieval_ms,
+            Recommendation.generation_ms,
+        )
+        .where(Recommendation.user_id == user_id)
+        .order_by(Recommendation.created_at.desc())
+    )
     if generator:
         stmt = stmt.where(Recommendation.generator == generator)
     rows = db.session.execute(stmt.limit(limit)).all()

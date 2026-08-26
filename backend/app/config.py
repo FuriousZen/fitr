@@ -40,6 +40,12 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
+def _env_list(name: str) -> list[str]:
+    """Comma-separated values, stripped, with blanks dropped."""
+    raw = os.environ.get(name) or ""
+    return [part.strip() for part in raw.split(",") if part.strip()]
+
+
 class Config:
     """Base config. Values are resolved at class-definition time."""
 
@@ -79,7 +85,10 @@ class Config:
     # --- Misc -------------------------------------------------------------
     MAX_IMAGE_BYTES = _env_int("FITR_MAX_IMAGE_BYTES", 10 * 1024 * 1024)
     CANDIDATE_K = _env_int("FITR_CANDIDATE_K", 12)
-    CORS_ORIGINS = os.environ.get("FITR_CORS_ORIGINS", "*")
+    #: Browser origins allowed to call the API. Empty means no CORS headers
+    #: are sent at all, so browsers refuse cross-origin calls; the iOS app is
+    #: not a browser and is unaffected.
+    CORS_ORIGINS = _env_list("FITR_CORS_ORIGINS")
 
     JSON_SORT_KEYS = False
 

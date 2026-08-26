@@ -480,10 +480,7 @@ struct AddClothingView: View {
     }
     
     private func saveClothingItem() {
-        guard !isUploading else {
-            print("Upload already in progress - ignoring duplicate call")
-            return
-        }
+        guard !isUploading else { return }
         
         guard let userId = authManager.currentUser?.id, let image = selectedImage else {
             errorMessage = "Missing user ID or image"
@@ -545,29 +542,13 @@ struct AddClothingView: View {
         
         FirebaseService.shared.saveClothingItem(item: clothingItem) { result in
             DispatchQueue.main.async {
-                self.isLoading = false
-                self.isUploading = false
-                
                 switch result {
                 case .success:
-                    self.toastMessage = "Item saved successfully!"
-                    self.isSuccessToast = true
-                    self.showToast = true
-                    
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                        withAnimation {
-                            self.showToast = false
-                        }
-                        self.presentationMode.wrappedValue.dismiss()
-                        
-                        NotificationCenter.default.post(
-                            name: Notification.Name("WardrobeUpdated"),
-                            object: nil,
-                            userInfo: ["operation": "add"]
-                        )
-                    }
+                    self.registerWithBackend(clothingItem)
                     
                 case .failure(let error):
+                    self.isLoading = false
+                    self.isUploading = false
                     self.errorMessage = "Failed to save clothing item: \(error.localizedDescription)"
                     
                     self.toastMessage = "Failed to save item"
@@ -584,6 +565,48 @@ struct AddClothingView: View {
         }
     }
     
+    /// Firestore holds the item; the backend needs a copy of the photo so
+    /// CLIP can embed it and the recommender's k-NN index can see it. Without
+    /// a backend configured the item is complete once Firestore has it.
+    private func registerWithBackend(_ item: ClothingItem) {
+        guard BackendService.shared.isConfigured, let image = selectedImage else {
+            finishSave(message: "Item saved successfully!", success: true)
+            return
+        }
+        BackendService.shared.registerItem(item, image: image) { result in
+            switch result {
+            case .success:
+                self.finishSave(message: "Item saved successfully!", success: true)
+            case .failure(let error):
+                self.finishSave(
+                    message: "Saved, but not indexed for recommendations: \(error.localizedDescription)",
+                    success: false
+                )
+            }
+        }
+    }
+    
+    private func finishSave(message: String, success: Bool) {
+        isLoading = false
+        isUploading = false
+        toastMessage = message
+        isSuccessToast = success
+        showToast = true
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+            withAnimation {
+                self.showToast = false
+            }
+            self.presentationMode.wrappedValue.dismiss()
+            
+            NotificationCenter.default.post(
+                name: Notification.Name("WardrobeUpdated"),
+                object: nil,
+                userInfo: ["operation": "add"]
+            )
+        }
+    }
+    
     private func handleUploadError(_ error: Error) {
         self.isLoading = false
         self.isUploading = false
@@ -596,15 +619,6 @@ struct AddClothingView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
             withAnimation {
                 self.showToast = false
-            }
-        }
-        
-        if let storageError = error as? StorageError {
-            switch storageError {
-            case .cancelled:
-                print("Upload was cancelled")
-            default:
-                print("Storage error occurred: \(storageError.localizedDescription)")
             }
         }
     }

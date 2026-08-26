@@ -9,12 +9,32 @@ import Firebase
 import FirebaseFirestore
 import FirebaseStorage
 import UIKit
+import os
 
 class FirebaseService {
     static let shared = FirebaseService()
     
     private let db = Firestore.firestore()
     private let storage = Storage.storage().reference()
+    private let log = Logger(subsystem: "app.fitr", category: "backend-sync")
+    
+    // MARK: - Backend mirror
+    
+    /// Firestore is the wardrobe's source of truth; the backend keeps a copy
+    /// so the recommender can run CLIP k-NN over it and skip dirty items.
+    /// Mirroring runs after the Firestore write succeeds and never fails the
+    /// user's action: a divergent index is repaired by the next write to that
+    /// item, which is a better outcome than blocking laundry on the network.
+    private func mirrorToBackend(_ what: String, _ operation: @escaping () async throws -> Void) {
+        guard BackendService.shared.isConfigured else { return }
+        Task {
+            do {
+                try await operation()
+            } catch {
+                log.error("backend mirror failed for \(what, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
     
     // MARK: - Clothing Items
     
@@ -115,6 +135,10 @@ class FirebaseService {
                 return
             }
             
+            self.mirrorToBackend("delete \(item.id)") {
+                try await BackendService.shared.deleteItem(itemId: item.id)
+            }
+            
             if !item.imageURL.isEmpty {
                 let storageRef = self.storage.storage.reference(forURL: item.imageURL)
                 storageRef.delete { error in
@@ -158,6 +182,9 @@ class FirebaseService {
             
             try itemRef.setData(from: dirtyItem)
             
+            mirrorToBackend("mark dirty \(item.id)") {
+                _ = try await BackendService.shared.setDirty(itemId: item.id, dirty: true)
+            }
             completion(.success(()))
         } catch {
             completion(.failure(error))
@@ -181,6 +208,9 @@ class FirebaseService {
                 if let error = error {
                     completion(.failure(error))
                 } else {
+                    self.mirrorToBackend("wash \(items.count) item(s)") {
+                        _ = try await BackendService.shared.washItems(itemIds: items.map { $0.id })
+                    }
                     completion(.success(()))
                 }
             }

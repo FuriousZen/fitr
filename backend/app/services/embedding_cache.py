@@ -138,10 +138,15 @@ class EmbeddingCache:
         )
 
     def peek_tier(self, data: bytes) -> str:
-        """Which tier *would* serve these bytes, without mutating anything."""
+        """Which tier *would* serve these bytes, without mutating anything.
+
+        Reads the L1 dict directly rather than through ``_l1_get`` so the
+        lookup does not count as a use and reorder the LRU.
+        """
         digest = content_hash(data)
-        if self._l1_get(digest) is not None:
-            return L1
+        with self._lock:
+            if self._l1_key(digest) in self._l1:
+                return L1
         exists = db.session.execute(
             select(ImageEmbedding.content_hash).where(
                 ImageEmbedding.content_hash == digest,

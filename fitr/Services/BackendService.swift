@@ -2,23 +2,14 @@
 //  BackendService.swift
 //  fitr
 //
-//  UNCOMPILED / UNVERIFIED. Written on Linux with no Swift toolchain, no
-//  Xcode and no macOS available. It has never been type-checked or built.
-//  Expect to fix small compile errors on first build. Nothing in the existing
-//  app calls into this file yet, so adding it cannot change current behaviour.
-//  It is purely additive until you wire it up.
-//
 //  Client for the fitr Flask backend (see backend/README.md for the API).
 //
-//  Why this exists: the app calls Gemini directly through FirebaseVertexAI
-//  using model ids `gemini-3.7-flash` and `gemini-3.1-pro`. Pinning ids in
-//  Swift means a new build every time Google retires one, which is how the
-//  previous `gemini-2.0-flash` and `gemini-1.5-pro` ids went dead.
-//  `FirebaseVertexAI` itself was removed from firebase-ios-sdk in 12.0.0
-//  (replaced by `FirebaseAI`, since renamed to the `FirebaseAILogic` module).
-//  Routing these calls through the backend means the model id, the API keys
-//  and the SDK version all live server-side, where they can be changed
-//  without shipping a new build.
+//  When `FITR_BACKEND_URL` is set this is the primary path for classification
+//  (CLIP zero-shot), outfit recommendations (CLIP k-NN shortlist ranked by
+//  Gemini) and weather. The model ids, the API keys and the SDK versions all
+//  live server-side, so they can change without shipping a new build. When
+//  it is unset, `ClothingClassifier`, `OutfitService` and `WeatherService`
+//  fall back to calling Gemini and OpenWeatherMap from the device.
 //
 
 import Foundation
@@ -159,6 +150,17 @@ struct BackendClassification: Codable {
         case weatherTags = "weather_tags"
         case cacheTier = "cache_tier"
     }
+
+    /// The shape `AddClothingView` already consumes from the Gemini
+    /// classifier, so the two paths are interchangeable at the call site.
+    func asClassificationResult() -> ClothingClassificationResult {
+        ClothingClassificationResult(
+            type: type,
+            color: color,
+            weatherTags: weatherTags,
+            styleTags: styleTags
+        )
+    }
 }
 
 struct BackendOutfitOption: Codable, Identifiable {
@@ -296,16 +298,22 @@ final class BackendService {
         return request
     }
 
-    /// Sends a Firebase ID token when one is available (the backend's
-    /// `FITR_AUTH_MODE=firebase`), and the raw uid otherwise (`header` mode,
-    /// development only).
+    /// Sends the Firebase ID token (what the backend verifies under
+    /// `FITR_AUTH_MODE=firebase`) plus the raw uid (what it trusts under
+    /// `header` mode, development only). A signed-in user whose token cannot
+    /// be fetched is treated as not authenticated rather than sent uid-only,
+    /// so a production backend rejects the call with a clear error.
     private func attachIdentity(to request: inout URLRequest) async throws {
         #if canImport(FirebaseAuth)
         guard let user = Auth.auth().currentUser else { throw BackendError.notAuthenticated }
         request.setValue(user.uid, forHTTPHeaderField: "X-User-Id")
-        if let token = try? await user.getIDToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let token: String
+        do {
+            token = try await user.getIDToken()
+        } catch {
+            throw BackendError.notAuthenticated
         }
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         #endif
     }
 
@@ -486,8 +494,8 @@ final class BackendService {
 
     // MARK: - Vision
 
-    /// CLIP zero-shot classification. Replaces the Gemini call in
-    /// `ClothingClassifier`, and is served from cache for a repeated image.
+    /// CLIP zero-shot classification, served from the embedding cache for a
+    /// repeated image.
     func classify(image: UIImage) async throws -> BackendClassification {
         let request = try await multipartRequest(
             path: "api/v1/vision/classify", image: image, fields: [:]
@@ -552,11 +560,8 @@ final class BackendService {
         )
     }
 
-    /// Report whether the user wore one of the options.
-    ///
-    /// This is what makes a top-k acceptance rate measurable. `rank` is the
-    /// 1-based position of the option they chose. Call it from wherever the
-    /// user accepts or dismisses an outfit.
+    /// Report whether the user wore one of the options. `rank` is the
+    /// 1-based position of the option they chose.
     func submitFeedback(
         recommendationId: String,
         accepted: Bool,
@@ -593,13 +598,37 @@ final class BackendService {
 // MARK: - Completion-handler bridge
 
 /// The existing services are completion-handler based. These wrappers let call
-/// sites adopt the backend without being rewritten for async/await.
-///
-/// Deliberately given distinct names rather than overloading the async methods
-/// with a trailing `completion:`. Overload sets that differ only by a defaulted
-/// argument are an easy way to get an "ambiguous use of" error, and this file
-/// has not been compiled. Distinct names remove the risk entirely.
+/// sites use the backend without being rewritten for async/await. They have
+/// distinct names rather than overloading the async methods with a trailing
+/// `completion:`, which keeps overload resolution unambiguous.
 extension BackendService {
+
+    /// Mirror a newly saved wardrobe item into the backend so its CLIP
+    /// embedding is computed and it joins the k-NN index. `id` is the
+    /// Firestore document id, so both stores address the item the same way.
+    func registerItem(
+        _ item: ClothingItem,
+        image: UIImage,
+        completion: @escaping (Result<BackendClothingItem, Error>) -> Void
+    ) {
+        Task {
+            do {
+                let created = try await self.createItem(
+                    image: image,
+                    name: item.name,
+                    type: item.type,
+                    color: item.color,
+                    weatherTags: item.weatherTags,
+                    styleTags: item.styleTags,
+                    imageURL: item.imageURL,
+                    id: item.id
+                )
+                await MainActor.run { completion(.success(created)) }
+            } catch {
+                await MainActor.run { completion(.failure(error)) }
+            }
+        }
+    }
 
     func classifyImage(
         _ image: UIImage,

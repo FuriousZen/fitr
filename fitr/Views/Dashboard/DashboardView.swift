@@ -26,10 +26,16 @@ struct DashboardView: View {
     @State private var vibeButtonsAppeared = false
     @State private var selectedVibeScale: CGFloat = 1.0
     
-    @State private var locationRetryCount = 0
-    private let maxLocationRetries = 3
+    /// True while the dashboard is waiting on Core Location before it can
+    /// fetch weather; cleared once a fix, a denial or an error arrives.
+    @State private var awaitingLocation = false
     
     private let vibes = ["Casual", "Formal", "Athletic", "Cozy", "Night Out"]
+    
+    /// Used only when the user has declined location access. The copy shown
+    /// alongside the weather card says so.
+    private let fallbackCity = "Charlottesville,VA,US"
+    private let fallbackCityLabel = "Charlottesville, VA"
     
     var body: some View {
         if authManager.isLoading {
@@ -55,6 +61,24 @@ struct DashboardView: View {
             .environmentObject(authManager)
             .onAppear {
                 loadData()
+            }
+            .onReceive(locationManager.$location) { location in
+                guard awaitingLocation, let location = location else { return }
+                awaitingLocation = false
+                fetchWeather(for: location.coordinate)
+            }
+            .onReceive(locationManager.$authorizationStatus) { status in
+                guard awaitingLocation else { return }
+                if status == .denied || status == .restricted {
+                    awaitingLocation = false
+                    fetchWeatherForFallbackCity()
+                }
+            }
+            .onReceive(locationManager.$locationError) { error in
+                guard awaitingLocation, error != nil else { return }
+                awaitingLocation = false
+                errorMessage = "Could not determine your location. Showing weather for \(fallbackCityLabel)."
+                fetchWeatherForFallbackCity()
             }
             .onReceive(NotificationCenter.default.publisher(for: Notification.Name("WardrobeUpdated"))) { notification in
 
@@ -82,7 +106,6 @@ struct DashboardView: View {
         isLoading = true
         errorMessage = nil
         isWardrobeEmpty = false
-        locationRetryCount = 0
          selectedVibe = nil
          outfit = nil
          vibeSelectionAppeared = false
@@ -122,30 +145,85 @@ struct DashboardView: View {
         }
     }
     
+    /// Weather for wherever the device is. The device's coordinates drive
+    /// the lookup; the fixed city is used only when location access has been
+    /// denied, and the UI says so.
     private func loadWeatherData() {
         isLoading = true
-            WeatherService.shared.getWeatherForCharlottesville { result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let weather):
-                    self.weather = weather
-                    self.isLoading = false
-                case .failure(let error):
-                    print("Weather error: \(error.localizedDescription)")
-                    self.errorMessage = "Weather service unavailable. Using default recommendation."
-                    self.useDefaultWeather()
+        
+        if let location = locationManager.location {
+            fetchWeather(for: location.coordinate)
+            return
+        }
+        
+        switch locationManager.authorizationStatus {
+        case .denied, .restricted:
+            fetchWeatherForFallbackCity()
+        default:
+            awaitingLocation = true
+            locationManager.requestLocation()
+        }
+    }
+    
+    private func fetchWeather(for coordinate: CLLocationCoordinate2D) {
+        if BackendService.shared.isConfigured {
+            Task {
+                do {
+                    let weather = try await BackendService.shared.weather(
+                        latitude: coordinate.latitude, longitude: coordinate.longitude
+                    ).asWeather()
+                    await MainActor.run { self.handleWeather(.success(weather)) }
+                } catch {
+                    await MainActor.run { self.handleWeather(.failure(error)) }
                 }
             }
+            return
+        }
+        WeatherService.shared.getWeather(latitude: coordinate.latitude, longitude: coordinate.longitude) { result in
+            DispatchQueue.main.async { self.handleWeather(result) }
+        }
+    }
+    
+    private func fetchWeatherForFallbackCity() {
+        if errorMessage == nil {
+            errorMessage = "Location access is off, so this is the weather for \(fallbackCityLabel). Allow location access in Settings for your local forecast."
+        }
+        if BackendService.shared.isConfigured {
+            Task {
+                do {
+                    let weather = try await BackendService.shared.weather(city: fallbackCity).asWeather()
+                    await MainActor.run { self.handleWeather(.success(weather)) }
+                } catch {
+                    await MainActor.run { self.handleWeather(.failure(error)) }
+                }
+            }
+            return
+        }
+        WeatherService.shared.getWeather(city: fallbackCity) { result in
+            DispatchQueue.main.async { self.handleWeather(result) }
+        }
+    }
+    
+    private func handleWeather(_ result: Result<Weather, Error>) {
+        switch result {
+        case .success(let weather):
+            self.weather = weather
+            self.isLoading = false
+        case .failure(let error):
+            self.errorMessage = "Weather unavailable (\(error.localizedDescription)). Recommending for a mild, cloudy day instead."
+            self.useDefaultWeather()
         }
     }
 
+    /// Imperial, to match the `units=imperial` requests and the °F the views
+    /// render: 68 °F is the 20 °C "mild day" the outfit rules treat as neutral.
     private func useDefaultWeather() {
         let defaultWeather = Weather(
-            temperature: 20.0,
+            temperature: 68.0,
             condition: .cloudy,
             humidity: 50,
             windSpeed: 10,
-            location: "Default Location",
+            location: "Unknown location",
             date: Date()
         )
         
